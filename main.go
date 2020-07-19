@@ -61,15 +61,20 @@ func (glob *Global) handleHook(c *gin.Context) {
 		log.Panic(err)
 	}
 
-	status, err := checkHealth(*payload.Message.Text)
+	status, code, err := checkHealth(*payload.Message.Text)
+
 	var msg tgbotapi.MessageConfig
 	if err != nil {
 		msg = tgbotapi.NewMessage(*payload.Message.Chat.ID, "Gimme a correct URL")
 	} else {
 		if status {
-			msg = tgbotapi.NewMessage(*payload.Message.Chat.ID, "It's a 200 Cap'n")
+			msg = tgbotapi.NewMessage(*payload.Message.Chat.ID, fmt.Sprintf("It's a %d Cap'n", code))
 		} else {
-			msg = tgbotapi.NewMessage(*payload.Message.Chat.ID, "Hmm, you better take a look at it yourself.")
+			if code != 1 {
+				msg = tgbotapi.NewMessage(*payload.Message.Chat.ID, fmt.Sprintf("Bad news, it says %d", code))
+			} else {
+				msg = tgbotapi.NewMessage(*payload.Message.Chat.ID, "Stop fooling around")
+			}
 		}
 	}
 
@@ -79,16 +84,19 @@ func (glob *Global) handleHook(c *gin.Context) {
 	c.JSON(200, nil)
 }
 
-func checkHealth(site string) (bool, error) {
+func checkHealth(site string) (bool, int, error) {
 	web, err := url.ParseRequestURI(site)
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 
 	resp, err := http.Get(web.String())
-	if (err == nil) && (resp.StatusCode == 200) {
-		return true, nil
+	if err != nil {
+		return false, 1, nil
 	}
 
-	return false, nil
+	if resp.StatusCode == 200 {
+		return true, resp.StatusCode, nil
+	}
+	return false, resp.StatusCode, nil
 }
