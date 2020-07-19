@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 
@@ -59,11 +61,34 @@ func (glob *Global) handleHook(c *gin.Context) {
 		log.Panic(err)
 	}
 
-	msg := tgbotapi.NewMessage(*payload.Message.Chat.ID, "Yeah I am here")
+	status, err := checkHealth(*payload.Message.Text)
+	var msg tgbotapi.MessageConfig
+	if err != nil {
+		msg = tgbotapi.NewMessage(*payload.Message.Chat.ID, "Gimme a correct URL")
+	} else {
+		if status {
+			msg = tgbotapi.NewMessage(*payload.Message.Chat.ID, "It's a 200 Cap'n")
+		} else {
+			msg = tgbotapi.NewMessage(*payload.Message.Chat.ID, "Hmm, you better take a look at it yourself.")
+		}
+	}
+
 	msg.ReplyToMessageID = int(*payload.Message.MessageID)
 	glob.Bot.Send(msg)
 
-	c.JSON(200, gin.H{
-		"message": str,
-	})
+	c.JSON(200, nil)
+}
+
+func checkHealth(site string) (bool, error) {
+	web, err := url.ParseRequestURI(site)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := http.Get(web.String())
+	if (err == nil) && (resp.StatusCode == 200) {
+		return true, nil
+	}
+
+	return false, nil
 }
