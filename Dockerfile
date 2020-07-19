@@ -28,16 +28,15 @@ RUN go build -o main .
 WORKDIR /dist
 
 # Copy binary from build to main folder
-RUN cp /build/* .
+RUN cp /build/main .
 
 ############################
 # STEP 2 build a small image
 ############################
 FROM scratch
 
-COPY ./.env /
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /dist/* /
+COPY --from=builder /dist/main /
 
 EXPOSE 8080
 
