@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 
+	"github.com/Donnie/mandown/domains/message"
+	"github.com/Donnie/mandown/domains/web"
 	"github.com/gin-gonic/gin"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/joho/godotenv"
@@ -34,17 +34,17 @@ func main() {
 	}
 	bot.Debug, _ = strconv.ParseBool(os.Getenv("DEBUG"))
 
-	fmt.Printf("Authorized on account %s", bot.Self.UserName)
-
+	// Store useful items on Global context
 	global := Global{Bot: bot}
 
+	// Start Gin Server
 	r := gin.Default()
 
 	r.POST("/hook", global.handleHook)
-
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, nil)
 	})
+
 	r.Run()
 }
 
@@ -53,49 +53,19 @@ func (glob *Global) handleHook(c *gin.Context) {
 	buf.ReadFrom(c.Request.Body)
 	str := buf.String()
 
-	var payload Input
+	var input Input
 
-	err := json.Unmarshal([]byte(str), &payload)
+	err := json.Unmarshal([]byte(str), &input)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	status, code, err := checkHealth(*payload.Message.Text)
+	code, _ := web.CheckHealth(*input.Message.Text)
+	output := message.Process(code)
 
-	var msg tgbotapi.MessageConfig
-	if err != nil {
-		msg = tgbotapi.NewMessage(*payload.Message.Chat.ID, "Gimme a correct URL")
-	} else {
-		if status {
-			msg = tgbotapi.NewMessage(*payload.Message.Chat.ID, fmt.Sprintf("It's a %d Cap'n", code))
-		} else {
-			if code != 1 {
-				msg = tgbotapi.NewMessage(*payload.Message.Chat.ID, fmt.Sprintf("Bad news, it says %d", code))
-			} else {
-				msg = tgbotapi.NewMessage(*payload.Message.Chat.ID, "Stop fooling around")
-			}
-		}
-	}
-
-	msg.ReplyToMessageID = int(*payload.Message.MessageID)
+	msg := tgbotapi.NewMessage(*input.Message.Chat.ID, output)
+	msg.ReplyToMessageID = int(*input.Message.MessageID)
 	glob.Bot.Send(msg)
 
 	c.JSON(200, nil)
-}
-
-func checkHealth(site string) (bool, int, error) {
-	web, err := url.ParseRequestURI(site)
-	if err != nil {
-		return false, 0, err
-	}
-
-	resp, err := http.Get(web.String())
-	if err != nil {
-		return false, 1, nil
-	}
-
-	if resp.StatusCode == 200 {
-		return true, resp.StatusCode, nil
-	}
-	return false, resp.StatusCode, nil
 }

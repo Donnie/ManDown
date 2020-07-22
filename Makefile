@@ -18,6 +18,8 @@ live:
 	ssh root@45.77.148.205 rm /root/.env
 	@echo "Is live"
 
+publish: deploy live
+
 clean:
 	docker stop mandown
 	@echo "all clear"
