@@ -1,6 +1,9 @@
 package message
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 func Process(code int) string {
 	var output string
@@ -15,4 +18,34 @@ func Process(code int) string {
 		output = fmt.Sprintf("Bad news, it says %d", code)
 	}
 	return output
+}
+
+func Template(temp string) string {
+	var output string
+	switch temp {
+	case "start":
+		output = "We can chat by these commands:\n" +
+			"/track https://yourdomain.com - Get notified when the status of the URL changes\n" +
+			"Ex: /track https://telegram.org\n\n" +
+			"/untrack https://yourdomain.com - Stop following an URL\n" +
+			"Ex: /untrack https://telegram.org\n"
+	default:
+		output = "Didn't really get you."
+	}
+
+	return output
+}
+
+func ExtractMotive(text string) (string, string) {
+	s := strings.Fields(text)
+	if strings.Contains(s[0], "/start") {
+		return "start", ""
+	}
+	if strings.Contains(s[0], "/track") {
+		return "track", s[1]
+	}
+	if strings.Contains(s[0], "/untrack") {
+		return "untrack", s[1]
+	}
+	return "", ""
 }
