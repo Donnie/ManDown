@@ -4,16 +4,19 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
 
+// Global holds fundamental items
 type Global struct {
 	Bot  *tgbotapi.BotAPI
 	File string
 }
 
+// Input struct
 type Input struct {
 	UpdateID *int64   `json:"update_id"`
 	Message  *Message `json:"message"`
 }
 
+// Message struct
 type Message struct {
 	MessageID *int64  `json:"message_id"`
 	From      *From   `json:"from"`
@@ -22,6 +25,7 @@ type Message struct {
 	Text      *string `json:"text"`
 }
 
+// From struct
 type From struct {
 	ID           *int64  `json:"id"`
 	IsBot        *bool   `json:"is_bot"`
@@ -31,6 +35,7 @@ type From struct {
 	LanguageCode *string `json:"language_code"`
 }
 
+// Chat struct
 type Chat struct {
 	ID        *int64  `json:"id"`
 	FirstName *string `json:"first_name"`

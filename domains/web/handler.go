@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// CheckHealth gets the Status code of a website
 func CheckHealth(site string) (int, error) {
 	web, err := url.ParseRequestURI(site)
 	if err != nil {
@@ -20,6 +21,7 @@ func CheckHealth(site string) (int, error) {
 	return resp.StatusCode, nil
 }
 
+// Sanitise makes sure only the domain name gets through
 func Sanitise(site string) string {
 	web, err := url.Parse(strings.ToLower(site))
 	if err != nil {

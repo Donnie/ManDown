@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// Process to process Status codes
 func Process(code int) string {
 	var output string
 	switch code {
@@ -20,6 +21,7 @@ func Process(code int) string {
 	return output
 }
 
+// Template to provide generic text
 func Template(temp string) string {
 	var output string
 	switch temp {
@@ -40,6 +42,7 @@ func Template(temp string) string {
 	return output
 }
 
+// ExtractMotive extracts the slash-command from a Telegram message
 func ExtractMotive(text string) (string, string) {
 	s := strings.Fields(text)
 	if strings.Contains(s[0], "/help") {

@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// WriteFileCSV takes in a 2D array and overwrites to a csv file
 func WriteFileCSV(records [][]string, file string) error {
 	err := os.Remove(file)
 	if err != nil {
@@ -32,6 +33,7 @@ func WriteFileCSV(records [][]string, file string) error {
 	return nil
 }
 
+// WriteLineCSV takes in a row and appends to a CSV file
 func WriteLineCSV(record []string, file string) error {
 	createPath(file)
 	csvFile, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
@@ -49,6 +51,7 @@ func WriteLineCSV(record []string, file string) error {
 	return nil
 }
 
+// ReadCSV reads the entire file into a 2D array
 func ReadCSV(file string) ([][]string, error) {
 	createPath(file)
 	csvFile, err := os.Open(file)
