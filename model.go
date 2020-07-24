@@ -5,7 +5,8 @@ import (
 )
 
 type Global struct {
-	Bot *tgbotapi.BotAPI
+	Bot  *tgbotapi.BotAPI
+	File string
 }
 
 type Input struct {

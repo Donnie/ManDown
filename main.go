@@ -31,6 +31,11 @@ func main() {
 		fmt.Println("Add TELEGRAM_TOKEN to .env file")
 		os.Exit(1)
 	}
+	filename, exists := os.LookupEnv("DBFILE")
+	if !exists {
+		fmt.Println("Add DBFILE to .env file")
+		os.Exit(1)
+	}
 
 	bot, err := tgbotapi.NewBotAPI(teleToken)
 	if err != nil {
@@ -39,7 +44,7 @@ func main() {
 	bot.Debug, _ = strconv.ParseBool(os.Getenv("DEBUG"))
 
 	// Store useful items on Global context
-	global := Global{Bot: bot}
+	global := Global{Bot: bot, File: filename}
 
 	// Start Gin Server
 	r := gin.Default()
@@ -80,7 +85,7 @@ func (glob *Global) handleHook(c *gin.Context) {
 			strconv.Itoa(code),
 		}
 
-		file.WriteLineCSV(record, "db.csv")
+		file.WriteLineCSV(record, glob.File)
 	}
 
 	c.JSON(200, nil)
@@ -88,7 +93,7 @@ func (glob *Global) handleHook(c *gin.Context) {
 
 func (glob *Global) handlePoll(c *gin.Context) {
 	var records [][]string
-	lines := file.ReadCSV("db.csv")
+	lines, _ := file.ReadCSV(glob.File)
 
 	for _, line := range lines {
 		site := line[0]
@@ -117,7 +122,7 @@ func (glob *Global) handlePoll(c *gin.Context) {
 		}
 	}
 
-	file.WriteFileCSV(records, "db.csv")
+	file.WriteFileCSV(records, glob.File)
 	c.JSON(200, nil)
 }
 

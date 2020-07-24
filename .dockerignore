@@ -1,3 +1,5 @@
 .dockerignore
+db
 .git
 main
+*.csv
