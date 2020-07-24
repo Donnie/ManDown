@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 func CheckHealth(site string) (int, error) {
@@ -17,4 +18,18 @@ func CheckHealth(site string) (int, error) {
 	}
 
 	return resp.StatusCode, nil
+}
+
+func Sanitise(site string) string {
+	web, err := url.Parse(strings.ToLower(site))
+	if err != nil {
+		return ""
+	}
+
+	if web.Scheme != "http" {
+		web.Scheme = "https"
+	}
+
+	web, _ = url.Parse(web.String())
+	return web.Scheme + "://" + web.Hostname()
 }

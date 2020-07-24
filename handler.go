@@ -89,6 +89,7 @@ func (glob *Global) sendMessage(chatID int64, text string, messageID *int64) {
 }
 
 func (glob *Global) handleTrack(site string, msg Message) string {
+	site = web.Sanitise(site)
 	code, _ := web.CheckHealth(site)
 	output := message.Process(code)
 
@@ -109,15 +110,15 @@ func (glob *Global) handleTrack(site string, msg Message) string {
 	return output
 }
 
-func (glob *Global) handleUnTrack(arg string, msg Message) string {
+func (glob *Global) handleUnTrack(site string, msg Message) string {
+	site = web.Sanitise(site)
 	var records [][]string
 	lines, _ := file.ReadCSV(glob.File)
 
 	for _, line := range lines {
-		site := line[0]
 		chatID, _ := strconv.ParseInt(line[1], 10, 64)
 
-		if arg == site && chatID == *msg.Chat.ID {
+		if site == line[0] && chatID == *msg.Chat.ID {
 			continue
 		}
 		records = append(records, line)

@@ -24,11 +24,11 @@ func Template(temp string) string {
 	var output string
 	switch temp {
 	case "start":
-		output = "We can chat by these commands:\n" +
-			"/track https://yourdomain.com - Get notified when the status of the URL changes\n" +
-			"Ex: /track https://telegram.org\n\n" +
-			"/untrack https://yourdomain.com - Stop following an URL\n" +
-			"Ex: /untrack https://telegram.org\n"
+		output = "We can chat by these commands:\n\n" +
+			"`/track yourdomain.com` - Get notified when the status of your domain changes\n" +
+			"Ex: `/track telegram.org`\n\n" +
+			"`/untrack yourdomain.com` - Stop following a domain\n" +
+			"Ex: `/untrack telegram.org`\n"
 	default:
 		output = "Didn't really get you."
 	}
