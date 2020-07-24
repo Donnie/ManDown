@@ -30,6 +30,8 @@ func (glob *Global) handleHook(c *gin.Context) {
 	motive, arg := message.ExtractMotive(*input.Message.Text)
 
 	switch motive {
+	case "list":
+		output = glob.handleList(*input.Message)
 	case "track":
 		output = glob.handleTrack(arg, *input.Message)
 	case "untrack":
@@ -88,14 +90,42 @@ func (glob *Global) sendMessage(chatID int64, text string, messageID *int64) {
 	glob.Bot.Send(msg)
 }
 
+func (glob *Global) handleList(msg Message) string {
+	var records [][]string
+	lines, _ := file.ReadCSV(glob.File)
+
+	for _, line := range lines {
+		chatID, _ := strconv.ParseInt(line[1], 10, 64)
+
+		if chatID != *msg.Chat.ID {
+			continue
+		}
+		records = append(records, line)
+	}
+
+	output := message.Template("list")
+	for num, record := range records {
+		output = output + strconv.Itoa(num+1) + ". `" + record[0] + "`\n"
+	}
+
+	return output
+}
+
 func (glob *Global) handleTrack(site string, msg Message) string {
 	site = web.Sanitise(site)
 	code, _ := web.CheckHealth(site)
 	output := message.Process(code)
 
 	if code != 0 && code != 1 {
-		tyme := time.Now()
+		lines, _ := file.ReadCSV(glob.File)
+		for _, line := range lines {
+			chatID, _ := strconv.ParseInt(line[1], 10, 64)
+			if site == line[0] && chatID == *msg.Chat.ID {
+				return output
+			}
+		}
 
+		tyme := time.Now()
 		record := []string{
 			site,
 			strconv.FormatInt(*msg.Chat.ID, 10),

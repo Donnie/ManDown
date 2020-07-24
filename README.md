@@ -18,3 +18,7 @@ Add your Telegram bot token to the .env file and then
 ### /untrack
 1. You send a message `/untrack donnieashok.in`
 2. The app deletes the line from the csv file with your chat_id and site
+
+### /list
+1. You send a message `/list`
+2. The app replies with all the websites you are currently tracking
