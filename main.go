@@ -7,13 +7,17 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
+	"github.com/Donnie/mandown/domains/file"
 	"github.com/Donnie/mandown/domains/message"
 	"github.com/Donnie/mandown/domains/web"
 	"github.com/gin-gonic/gin"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/joho/godotenv"
 )
+
+var layout = "2006-01-02 15:04:05"
 
 func init() {
 	if err := godotenv.Load(); err != nil {
@@ -41,6 +45,7 @@ func main() {
 	r := gin.Default()
 
 	r.POST("/hook", global.handleHook)
+	r.GET("/poll", global.handlePoll)
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, nil)
 	})
@@ -62,10 +67,64 @@ func (glob *Global) handleHook(c *gin.Context) {
 
 	code, _ := web.CheckHealth(*input.Message.Text)
 	output := message.Process(code)
+	glob.sendMessage(*input.Message.Chat.ID, output, input.Message.MessageID)
 
-	msg := tgbotapi.NewMessage(*input.Message.Chat.ID, output)
-	msg.ReplyToMessageID = int(*input.Message.MessageID)
-	glob.Bot.Send(msg)
+	if code != 0 && code != 1 {
+		tyme := time.Now()
+
+		record := []string{
+			*input.Message.Text,
+			strconv.FormatInt(*input.Message.Chat.ID, 10),
+			strconv.FormatInt(*input.Message.MessageID, 10),
+			tyme.Format(layout),
+			strconv.Itoa(code),
+		}
+
+		file.WriteLineCSV(record, "db.csv")
+	}
 
 	c.JSON(200, nil)
+}
+
+func (glob *Global) handlePoll(c *gin.Context) {
+	var records [][]string
+	lines := file.ReadCSV("db.csv")
+
+	for _, line := range lines {
+		site := line[0]
+		chatID, _ := strconv.ParseInt(line[1], 10, 64)
+		msgID, _ := strconv.ParseInt(line[2], 10, 64)
+		status, _ := strconv.Atoi(line[4])
+		tyme, _ := time.Parse(layout, line[3])
+
+		switch stat := status; {
+		case stat > 2:
+			status, _ = web.CheckHealth(site)
+			if status != stat {
+				tyme = time.Now()
+				output := message.Process(status)
+				glob.sendMessage(chatID, output, &msgID)
+			}
+
+			record := []string{
+				site,
+				line[1],
+				line[2],
+				tyme.Format(layout),
+				strconv.Itoa(status),
+			}
+			records = append(records, record)
+		}
+	}
+
+	file.WriteFileCSV(records, "db.csv")
+	c.JSON(200, nil)
+}
+
+func (glob *Global) sendMessage(chatID int64, text string, messageID *int64) {
+	msg := tgbotapi.NewMessage(chatID, text)
+	if messageID != nil {
+		msg.ReplyToMessageID = int(*messageID)
+	}
+	glob.Bot.Send(msg)
 }
