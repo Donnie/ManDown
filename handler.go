@@ -46,32 +46,38 @@ func (glob *Global) handleHook(c *gin.Context) {
 
 func (glob *Global) handlePoll(c *gin.Context) {
 	var records [][]string
+	var sites []string
+
 	lines, _ := file.ReadCSV(glob.File)
+
+	for _, line := range lines {
+		sites = append(sites, line[0])
+	}
+	results := web.CheckBulk(sites)
 
 	for _, line := range lines {
 		site := line[0]
 		chatID, _ := strconv.ParseInt(line[1], 10, 64)
 		msgID, _ := strconv.ParseInt(line[2], 10, 64)
-		status, _ := strconv.Atoi(line[4])
 		tyme, _ := time.Parse(layout, line[3])
+		status, _ := strconv.Atoi(line[4])
 
-		switch stat := status; {
-		case stat > 2:
-			status, _ = web.CheckHealth(site)
-			if status != stat {
-				tyme = time.Now()
-				output := message.Process(status)
-				glob.sendMessage(chatID, output, &msgID)
+		for _, result := range results {
+			if result.Site == site {
+				if result.Status != status {
+					tyme = time.Now()
+					output := message.Process(result.Site, result.Status, result.Misc)
+					glob.sendMessage(chatID, output, &msgID)
+				}
+				record := []string{
+					site,
+					line[1],
+					line[2],
+					tyme.Format(layout),
+					strconv.Itoa(result.Status),
+				}
+				records = append(records, record)
 			}
-
-			record := []string{
-				site,
-				line[1],
-				line[2],
-				tyme.Format(layout),
-				strconv.Itoa(status),
-			}
-			records = append(records, record)
 		}
 	}
 
@@ -112,9 +118,13 @@ func (glob *Global) handleList(msg Message) string {
 }
 
 func (glob *Global) handleTrack(site string, msg Message) string {
+	var output string
 	site = web.Sanitise(site)
-	code, _ := web.CheckHealth(site)
-	output := message.Process(code)
+	code, err := web.CheckHealth(site)
+	if err != nil {
+		output = message.Process(site, code, err.Error())
+	}
+	output = message.Process(site, code, "")
 
 	if code != 0 && code != 1 {
 		lines, _ := file.ReadCSV(glob.File)

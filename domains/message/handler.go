@@ -6,17 +6,15 @@ import (
 )
 
 // Process to process Status codes
-func Process(code int) string {
+func Process(site string, code int, msg string) string {
 	var output string
 	switch code {
-	case 0:
-		output = "Gimme a correct URL"
-	case 1:
-		output = "Seems like never existed"
+	case 0, 1:
+		output = fmt.Sprintf("Site: `%s`\n\nHoppla! We have an error message.\n\n `%s`", site, msg)
 	case 200, 201:
-		output = fmt.Sprintf("It's a %d Cap'n", code)
+		output = fmt.Sprintf("Site: `%s`\n\nJoohoo! It's a %d Cap'n", site, code)
 	default:
-		output = fmt.Sprintf("Bad news, it says %d", code)
+		output = fmt.Sprintf("Site: `%s`\n\nSchade! It says %d", site, code)
 	}
 	return output
 }
