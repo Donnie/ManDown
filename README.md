@@ -17,7 +17,7 @@ Add your Telegram bot token to the .env file and then
 1. You send a message `/track donnieashok.in`
 2. The app checks for errors 
 3. If it is a fine URL then it looks up the HTTP status
-4. The app logs the request in db.csv with the 5 params
+4. The app logs the request in the csv file with the 5 params
 
 ### polling
 1. The polling mechanism triggers the app at regular intervals. I am using
@@ -33,10 +33,17 @@ docker run -d -e METHOD=GET -e LOOP=60 --name concurl plavignotte/continuous-cur
 
 ### /list
 1. You send a message `/list`
-2. The app replies with all the websites you are currently tracking
+2. The app replies with all the domains you are currently tracking
+
+### /clear
+1. You send a message `/clear`
+2. The app clears all the domains you are currently tracking
 
 ## Improvements
 I will be glad if you have suggestions on improvements or bug reports. I will be happier if you would contribute code.
+
+## Testing
+To be added soon
 
 ## Questions
 Feel free to raise issues when you have questions or you are stuck somewhere.

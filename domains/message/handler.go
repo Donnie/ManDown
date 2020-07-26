@@ -35,6 +35,8 @@ func Template(temp string) string {
 			"Eg: `/clear`\n\n"
 	case "list":
 		output = "Here are your tracked domains:\n\n"
+	case "emptylist":
+		output = "Your list is empty."
 	default:
 		output = "Didn't really get you. /help"
 	}

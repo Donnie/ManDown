@@ -100,6 +100,7 @@ func (glob *Global) sendMessage(chatID int64, text string, messageID *int64) {
 
 func (glob *Global) handleList(msg Message) string {
 	var records [][]string
+	var output string
 	lines, _ := file.ReadCSV(glob.File)
 
 	for _, line := range lines {
@@ -111,11 +112,14 @@ func (glob *Global) handleList(msg Message) string {
 		records = append(records, line)
 	}
 
-	output := message.Template("list")
-	for num, record := range records {
-		output = output + strconv.Itoa(num+1) + ". `" + record[0] + "`\n"
+	if len(records) == 0 {
+		output = message.Template("emptylist")
+	} else {
+		output = message.Template("list")
+		for num, record := range records {
+			output = output + strconv.Itoa(num+1) + ". `" + record[0] + "`\n"
+		}
 	}
-
 	return output
 }
 
