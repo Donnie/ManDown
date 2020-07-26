@@ -30,6 +30,8 @@ func (glob *Global) handleHook(c *gin.Context) {
 	motive, arg := message.ExtractMotive(*input.Message.Text)
 
 	switch motive {
+	case "clear":
+		output = glob.handleClear(*input.Message)
 	case "list":
 		output = glob.handleList(*input.Message)
 	case "track":
@@ -161,5 +163,22 @@ func (glob *Global) handleUnTrack(site string, msg Message) string {
 	}
 
 	file.WriteFileCSV(records, glob.File)
-	return "removed"
+	return "Removed"
+}
+
+func (glob *Global) handleClear(msg Message) string {
+	var records [][]string
+	lines, _ := file.ReadCSV(glob.File)
+
+	for _, line := range lines {
+		chatID, _ := strconv.ParseInt(line[1], 10, 64)
+
+		if chatID == *msg.Chat.ID {
+			continue
+		}
+		records = append(records, line)
+	}
+
+	file.WriteFileCSV(records, glob.File)
+	return "All clear"
 }

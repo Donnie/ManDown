@@ -29,12 +29,14 @@ func Template(temp string) string {
 			"Eg: `/track telegram.org`\n\n" +
 			"`/untrack yourdomain.com` - Stop following a domain\n" +
 			"Eg: `/untrack telegram.org`\n\n" +
-			"`/list` - Get a list of your followed domains\n" +
-			"Eg: `/list`\n\n"
+			"/list - Get a list of your followed domains\n" +
+			"Eg: `/list`\n\n" +
+			"/clear - Clear your list of your followed domains\n" +
+			"Eg: `/clear`\n\n"
 	case "list":
 		output = "Here are your tracked domains:\n\n"
 	default:
-		output = "Didn't really get you."
+		output = "Didn't really get you. /help"
 	}
 
 	return output
@@ -57,6 +59,9 @@ func ExtractMotive(text string) (string, string) {
 	}
 	if strings.Contains(s[0], "/list") {
 		return "list", ""
+	}
+	if strings.Contains(s[0], "/clear") {
+		return "clear", ""
 	}
 	return "", ""
 }
