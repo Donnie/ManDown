@@ -61,19 +61,13 @@ func GetStatus(site string, ch chan<- Health) {
 	return
 }
 
-// CheckHealth gets the Status code of a website
-func CheckHealth(site string) (int, error) {
-	web, err := url.ParseRequestURI(site)
-	if err != nil {
-		return 0, err
-	}
+// CheckHealth gets the Status code of one domain
+func CheckHealth(site string) Health {
+	ch := make(chan Health)
+	go GetStatus(site, ch)
+	result := <-ch
 
-	resp, err := http.Get(web.String())
-	if err != nil {
-		return 1, err
-	}
-
-	return resp.StatusCode, nil
+	return result
 }
 
 // Sanitise makes sure only the domain name gets through

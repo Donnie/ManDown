@@ -118,15 +118,11 @@ func (glob *Global) handleList(msg Message) string {
 }
 
 func (glob *Global) handleTrack(site string, msg Message) string {
-	var output string
 	site = web.Sanitise(site)
-	code, err := web.CheckHealth(site)
-	if err != nil {
-		output = message.Process(site, code, err.Error())
-	}
-	output = message.Process(site, code, "")
+	result := web.CheckHealth(site)
+	output := message.Process(result.Site, result.Status, result.Misc)
 
-	if code != 0 && code != 1 {
+	if result.Status != 0 && result.Status != 1 {
 		lines, _ := file.ReadCSV(glob.File)
 		for _, line := range lines {
 			chatID, _ := strconv.ParseInt(line[1], 10, 64)
@@ -141,7 +137,7 @@ func (glob *Global) handleTrack(site string, msg Message) string {
 			strconv.FormatInt(*msg.Chat.ID, 10),
 			strconv.FormatInt(*msg.MessageID, 10),
 			tyme.Format(layout),
-			strconv.Itoa(code),
+			strconv.Itoa(result.Status),
 		}
 
 		file.WriteLineCSV(record, glob.File)
