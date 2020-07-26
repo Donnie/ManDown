@@ -1,5 +1,8 @@
 # ManDown
-You can use this bot to track availability of a website. The bot polls your favourite website at regular intervals to check the HTTP Status Code. Any change on the status code, for e.g.: 200 -> 500 or 502 -> 201, would be reported to you on your Telegram.
+You can use this bot to track availability of a website (or keep Heroku from sleeping :stuck_out_tongue_winking_eye:). 
+
+The bot polls your favourite website at regular intervals to check the HTTP Status Code. 
+Any change on the status code, for e.g.: 200 -> 500 or 502 -> 201, would be reported to you on your Telegram.
 
 Try it now on: https://t.me/ManDownBot
 

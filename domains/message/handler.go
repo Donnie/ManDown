@@ -32,11 +32,18 @@ func Template(temp string) string {
 			"/list - Get a list of your followed domains\n" +
 			"Eg: `/list`\n\n" +
 			"/clear - Clear your list of your followed domains\n" +
-			"Eg: `/clear`\n\n"
+			"Eg: `/clear`\n\n" +
+			"/about - Read About\n" +
+			"Eg: `/about`\n\n"
 	case "list":
 		output = "Here are your tracked domains:\n\n"
 	case "emptylist":
 		output = "Your list is empty."
+	case "about":
+		output = "*ManDown*:\n\n" +
+			"Open Source on [GitHub](https://github.com/Donnie/ManDown)\n" +
+			"Hosted on Vultr.com in New Jersey, USA\n" +
+			"No personally identifiable information is stored or used by this bot."
 	default:
 		output = "Didn't really get you. /help"
 	}
@@ -50,6 +57,9 @@ func ExtractMotive(text string) (string, string) {
 
 	if len(s) < 1 {
 		return "", ""
+	}
+	if strings.Contains(s[0], "/about") {
+		return "about", ""
 	}
 	if strings.Contains(s[0], "/start") {
 		return "start", ""
