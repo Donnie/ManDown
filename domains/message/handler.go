@@ -47,23 +47,31 @@ func Template(temp string) string {
 // ExtractMotive extracts the slash-command from a Telegram message
 func ExtractMotive(text string) (string, string) {
 	s := strings.Fields(text)
-	if strings.Contains(s[0], "/help") {
-		return "help", ""
+
+	if len(s) < 1 {
+		return "", ""
 	}
 	if strings.Contains(s[0], "/start") {
 		return "start", ""
 	}
-	if strings.Contains(s[0], "/track") {
-		return "track", s[1]
-	}
-	if strings.Contains(s[0], "/untrack") {
-		return "untrack", s[1]
+	if strings.Contains(s[0], "/help") {
+		return "help", ""
 	}
 	if strings.Contains(s[0], "/list") {
 		return "list", ""
 	}
 	if strings.Contains(s[0], "/clear") {
 		return "clear", ""
+	}
+
+	if len(s) != 2 {
+		return "", ""
+	}
+	if strings.Contains(s[0], "/track") {
+		return "track", s[1]
+	}
+	if strings.Contains(s[0], "/untrack") {
+		return "untrack", s[1]
 	}
 	return "", ""
 }

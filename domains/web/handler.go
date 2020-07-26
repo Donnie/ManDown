@@ -85,7 +85,7 @@ func Sanitise(site string) string {
 	return web.Scheme + "://" + web.Hostname()
 }
 
-// deDupeStr takes an array of strings and returns only unique items strings
+// deDupeStr takes an array of strings and returns only unique strings
 func deDupeStr(strs []string) []string {
 	deDuped := []string{}
 	for _, item := range strs {
