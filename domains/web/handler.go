@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // Health struct to contain Health of site
@@ -42,7 +43,11 @@ func GetStatus(site string, ch chan<- Health) {
 		return
 	}
 
-	resp, err := http.Get(web.String())
+	c := &http.Client{
+		Timeout: time.Minute,
+	}
+
+	resp, err := c.Get(web.String())
 	if err != nil {
 		ch <- Health{
 			Site:   site,
