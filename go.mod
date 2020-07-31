@@ -9,5 +9,5 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/technoweenie/multipartstreamer v1.0.1 // indirect
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
-	golang.org/x/tools v0.0.0-20200724172932-b5fc9d354d99 // indirect
+	golang.org/x/tools v0.0.0-20200729041821-df70183b1872 // indirect
 )
