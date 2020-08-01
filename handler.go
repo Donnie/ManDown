@@ -69,7 +69,7 @@ func (glob *Global) handlePoll(c *gin.Context) {
 				if result.Status != status {
 					tyme = time.Now()
 					output := message.Process(result.Site, result.Status, result.Misc)
-					glob.sendMessage(chatID, output, &msgID)
+					go glob.sendMessage(chatID, output, &msgID)
 				}
 				record := []string{
 					site,
