@@ -11,12 +11,13 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var layout = "2006-01-02 15:04:05"
-
 func init() {
-	if err := godotenv.Load(); err != nil {
-		log.Print("No .env file found")
+	if _, err := os.Stat(".env.local"); os.IsNotExist(err) {
+		godotenv.Load(".env")
+	} else {
+		godotenv.Load(".env.local")
 	}
+	fmt.Println("Running for " + os.Getenv("ENV"))
 }
 
 func main() {
