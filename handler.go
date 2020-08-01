@@ -16,6 +16,13 @@ import (
 
 var layout = "2006-01-02 15:04:05"
 
+func (glob *Global) poll(freq string) {
+	i, _ := strconv.Atoi(freq)
+	for range time.Tick(time.Second * time.Duration(i)) {
+		glob.executePoll()
+	}
+}
+
 func (glob *Global) handleHook(c *gin.Context) {
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(c.Request.Body)
@@ -48,7 +55,7 @@ func (glob *Global) handleHook(c *gin.Context) {
 	c.JSON(200, nil)
 }
 
-func (glob *Global) handlePoll(c *gin.Context) {
+func (glob *Global) executePoll() {
 	var records [][]string
 	var sites []string
 
@@ -86,7 +93,6 @@ func (glob *Global) handlePoll(c *gin.Context) {
 	}
 
 	file.WriteFileCSV(records, glob.File)
-	c.JSON(200, nil)
 }
 
 func (glob *Global) sendMessage(chatID int64, text string, messageID *int64) {

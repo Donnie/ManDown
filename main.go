@@ -43,9 +43,18 @@ func main() {
 		File: filename,
 	}
 
+	freq, exists := os.LookupEnv("FREQ")
+	if !exists || freq == "" {
+		freq = "600"
+	}
+	go global.poll(freq)
+
 	r := gin.Default()
 	r.POST("/hook", global.handleHook)
-	r.GET("/poll", global.handlePoll)
+	r.GET("/poll", func(c *gin.Context) {
+		global.executePoll()
+		c.JSON(200, nil)
+	})
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, nil)
 	})

@@ -23,10 +23,7 @@ Add your Telegram bot token to the .env file and then
 4. The app logs the request in the csv file with the 5 params
 
 ### polling
-1. The polling mechanism triggers the app at regular intervals. I am using
-```
-docker run -d -e METHOD=GET -e LOOP=60 --name concurl plavignotte/continuous-curl http://localhost:1338/poll
-```
+1. The polling mechanism triggers the app at regular intervals. The FREQ variable in the .env file is the frequency in number of seconds.
 2. The app reads the db.csv and checks if the status of the website has changed.
 3. If the status has changed it sends a message to you.
 
