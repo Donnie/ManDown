@@ -6,22 +6,25 @@ import (
 )
 
 // Process to process Status codes
-func Process(site string, code int, msg string) string {
-	var output string
-	switch code {
-	case 0, 1:
-		output = fmt.Sprintf("Site: `%s`\n\nHoppla! We have an error message.\n\n`%s`", site, msg)
-	case 200, 201:
-		output = fmt.Sprintf("Site: `%s`\n\nJoohoo! It's a %d Cap'n", site, code)
+func Process(site string, code int, msg string) (output string) {
+	output = fmt.Sprintf("Site: `%s`\n\n", site)
+	switch {
+	case code == 0 || code == 1:
+		output += fmt.Sprintf("Hoppla! We have an error message 🤒\n\n`%s`", msg)
+	case code >= 200 && code <= 299:
+		output += fmt.Sprintf("Joohoo! It's live and kicking 🙂!\n\nStatus: [%d](https://httpstatuses.com/%d)", code, code)
+	case code >= 400 && code <= 499:
+		output += fmt.Sprintf("Erm! Did I do something wrong? 🤔\n\nStatus: [%d](https://httpstatuses.com/%d)", code, code)
+	case code >= 500 && code <= 599:
+		output += fmt.Sprintf("Schade! It's down or inaccessible to me 😟\n\nStatus: [%d](https://httpstatuses.com/%d)", code, code)
 	default:
-		output = fmt.Sprintf("Site: `%s`\n\nSchade! It says %d", site, code)
+		output += "Something is fishy 🐟"
 	}
-	return output
+	return
 }
 
 // Template to provide generic text
-func Template(temp string) string {
-	var output string
+func Template(temp string) (output string) {
 	switch temp {
 	case "start", "help":
 		output = "I can understand these commands:\n\n" +
@@ -48,7 +51,7 @@ func Template(temp string) string {
 		output = "Didn't really get you. /help"
 	}
 
-	return output
+	return
 }
 
 // ExtractMotive extracts the slash-command from a Telegram message
