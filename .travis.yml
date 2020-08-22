@@ -1,0 +1,13 @@
+sudo: required
+language: generic
+services:
+    - docker
+
+before_install:
+    - docker build -t testit .
+
+deploy:
+    provider: script
+    script: make deploy
+    on:
+        branch: master

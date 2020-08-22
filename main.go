@@ -24,12 +24,12 @@ func main() {
 	teleToken, exists := os.LookupEnv("TELEGRAM_TOKEN")
 	if !exists {
 		fmt.Println("Add TELEGRAM_TOKEN to .env file")
-		os.Exit(1)
+		os.Exit(0)
 	}
 	filename, exists := os.LookupEnv("DBFILE")
 	if !exists {
 		fmt.Println("Add DBFILE to .env file")
-		os.Exit(1)
+		os.Exit(0)
 	}
 
 	bot, err := tgbotapi.NewBotAPI(teleToken)
