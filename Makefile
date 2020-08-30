@@ -24,6 +24,9 @@ live:
 
 publish: deploy live
 
+test:
+	go test ./...
+
 clean:
 	docker stop mandown
 	@echo "all clear"
