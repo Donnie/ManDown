@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
+	"time"
 
-	"github.com/gin-gonic/gin"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/joho/godotenv"
+	tb "gopkg.in/tucnak/telebot.v2"
 )
 
 func init() {
@@ -32,13 +31,16 @@ func main() {
 		os.Exit(0)
 	}
 
-	bot, err := tgbotapi.NewBotAPI(teleToken)
+	bot, err := tb.NewBot(tb.Settings{
+		Token:  teleToken,
+		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
+	})
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
+		return
 	}
-	bot.Debug, _ = strconv.ParseBool(os.Getenv("DEBUG"))
 
-	global := Global{
+	gl := Global{
 		Bot:  bot,
 		File: filename,
 	}
@@ -47,16 +49,18 @@ func main() {
 	if !exists || freq == "" {
 		freq = "600"
 	}
-	go global.poll(freq)
+	go gl.poll(freq)
 
-	r := gin.Default()
-	r.POST("/hook", global.handleHook)
-	r.GET("/poll", func(c *gin.Context) {
-		global.executePoll()
-		c.JSON(200, nil)
+	bot.Handle("/start", gl.handleHelp)
+	bot.Handle("/help", gl.handleHelp)
+	bot.Handle("/about", gl.handleAbout)
+	bot.Handle("/list", gl.handleList)
+	bot.Handle("/clear", gl.handleClear)
+	bot.Handle("/track", gl.handleTrack)
+	bot.Handle("/untrack", gl.handleUntrack)
+	bot.Handle(tb.OnText, func(m *tb.Message) {
+		gl.Bot.Send(m.Sender, "Didn't really get you. /help")
 	})
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, nil)
-	})
-	r.Run()
+
+	bot.Start()
 }

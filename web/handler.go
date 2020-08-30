@@ -78,7 +78,7 @@ func CheckHealth(site string) Health {
 // Sanitise makes sure only the domain name gets through
 func Sanitise(site string) string {
 	web, err := url.Parse(strings.ToLower(site))
-	if err != nil {
+	if err != nil || site == "" {
 		return ""
 	}
 
