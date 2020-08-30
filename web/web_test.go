@@ -61,7 +61,9 @@ func TestCheckHealth(t *testing.T) {
 		Status: 1,
 	}
 	found = CheckHealth("https://trustSecretWorld21.com")
-	require.Equal(t, expected, found)
+	require.Equal(t, expected.Site, found.Site)
+	require.Equal(t, expected.Status, found.Status)
+	require.Contains(t, found.Misc, "no such host")
 
 	expected = Health{
 		Site:   "https://google.com",
