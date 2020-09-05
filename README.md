@@ -11,18 +11,17 @@ Try it now on: https://t.me/ManDownBot
 Please also free to use this code base to run your own bot.
 
 ## Dev Setup
-After setting up ngrok on 8080, you need to [setWebhook](https://core.telegram.org/bots/api#setwebhook) through Telegram using the link from Ngrok
-
 ### Start Project
 Add your Telegram bot token to the .env file and then
-```go run .```
+
+```make dev```
 
 ## Functions
 ### /track
 1. You send a message `/track donnieashok.in`
-2. The app checks for errors 
+2. The app checks for errors in the URL string
 3. If it is a fine URL then it looks up the HTTP status
-4. The app logs the request in the csv file with the 5 params
+4. If it does not already exist in the tracked list it adds to the list
 
 ### polling
 1. The polling mechanism triggers the app at regular intervals. The FREQ variable in the .env file is the frequency in number of seconds.
@@ -42,10 +41,20 @@ Add your Telegram bot token to the .env file and then
 2. The app clears all the domains you are currently tracking
 
 ## Improvements
-I will be glad if you have suggestions on improvements or bug reports. I will be happier if you would contribute code.
+I will be glad if you have suggestions on improvements or bug reports, please make issues out of them. I will be happier if you would contribute code.
+
+## Contributing
+1. Fork it
+2. Clone develop: `git clone -b develop https://github.com/Donnie/ManDown`
+3. Create your feature branch: `git checkout -b new-feature`
+4. Make changes and add them: `git add .`
+5. Commit: `git commit -m "Add some feature"`
+6. Push: `git push origin new-feature`
+7. Pull request
 
 ## Testing
-To be added soon
+1. The web package has some basic testing.
+2. More testing needs to be added.
 
 ## Questions
 Feel free to raise issues when you have questions or you are stuck somewhere.
