@@ -71,3 +71,15 @@ func (rec *Record) Marshall() []string {
 		strconv.Itoa(int(rec.Status)),
 	}
 }
+
+// ExistsIn if it already exists
+func (rec *Record) ExistsIn(lines [][]string) bool {
+	for _, line := range lines {
+		exist := Record{}
+		exist.Unmarshall(line)
+		if exist.Site == rec.Site && exist.UserID == rec.UserID {
+			return true
+		}
+	}
+	return false
+}

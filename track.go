@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/Donnie/ManDown/file"
@@ -14,28 +13,20 @@ func (glob *Global) handleTrack(m *tb.Message) {
 	site := web.Sanitise(m.Payload)
 	result := web.CheckHealth(site)
 	output := message.Process(result.Site, result.Status, result.Misc)
+	go glob.Bot.Send(m.Sender, output, tb.ModeMarkdown)
 
 	if result.Status != 0 && result.Status != 1 {
+		rec := Record{
+			Site:      site,
+			UserID:    m.Sender.ID,
+			MessageID: m.ID,
+			Time:      time.Now(),
+			Status:    result.Status,
+		}
+
 		lines, _ := file.ReadCSV(glob.File)
-		for _, line := range lines {
-			chatID, _ := strconv.Atoi(line[1])
-			if site == line[0] && chatID == m.Sender.ID {
-				glob.Bot.Send(m.Sender, output, tb.ModeMarkdown)
-				return
-			}
+		if !rec.ExistsIn(lines) {
+			file.WriteLineCSV(rec.Marshall(), glob.File)
 		}
-
-		tyme := time.Now()
-		record := []string{
-			site,
-			strconv.Itoa(m.Sender.ID),
-			strconv.Itoa(m.ID),
-			tyme.Format(layout),
-			strconv.Itoa(result.Status),
-		}
-
-		file.WriteLineCSV(record, glob.File)
 	}
-
-	glob.Bot.Send(m.Sender, output, tb.ModeMarkdown)
 }
