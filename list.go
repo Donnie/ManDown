@@ -1,7 +1,7 @@
 package main
 
 import (
-	"strconv"
+	"fmt"
 
 	"github.com/Donnie/ManDown/file"
 	"github.com/Donnie/ManDown/message"
@@ -9,17 +9,17 @@ import (
 )
 
 func (glob *Global) handleList(m *tb.Message) {
-	var records [][]string
+	var records []Record
 	var output string
 	lines, _ := file.ReadCSV(glob.File)
 
 	for _, line := range lines {
-		chatID, _ := strconv.Atoi(line[1])
-
-		if chatID != m.Sender.ID {
+		rec := Record{}
+		rec.Unmarshall(line)
+		if rec.UserID != m.Sender.ID {
 			continue
 		}
-		records = append(records, line)
+		records = append(records, rec)
 	}
 
 	if len(records) == 0 {
@@ -27,7 +27,7 @@ func (glob *Global) handleList(m *tb.Message) {
 	} else {
 		output = message.Template("list")
 		for num, record := range records {
-			output = output + strconv.Itoa(num+1) + ". `" + record[0] + "`\n"
+			output += fmt.Sprintf("%d. `%s`\n", num+1, record.Site)
 		}
 	}
 	glob.Bot.Send(m.Sender, output, tb.ModeMarkdown)
