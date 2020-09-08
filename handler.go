@@ -20,41 +20,56 @@ func (glob *Global) poll(freq string) {
 }
 
 func (glob *Global) executePoll() {
-	var records [][]string
-	var sites []string
-
 	lines, _ := file.ReadCSV(glob.File)
-
+	var records []Record
 	for _, line := range lines {
-		sites = append(sites, line[0])
+		record := &Record{}
+		records = append(records, record.Unmarshall(line))
+	}
+	linesOut := glob.handleRecords(records)
+	file.WriteFileCSV(linesOut, glob.File)
+}
+
+func (glob *Global) handleRecords(recs []Record) (linesOut [][]string) {
+	var sites []string
+	for _, rec := range recs {
+		sites = append(sites, rec.Site)
 	}
 	results := web.CheckBulk(sites)
 
-	for _, line := range lines {
-		site := line[0]
-		chatID, _ := strconv.Atoi(line[1])
-		// msgID, _ := strconv.ParseInt(line[2], 10, 64)
-		tyme, _ := time.Parse(layout, line[3])
-		status, _ := strconv.Atoi(line[4])
-
+	for _, rec := range recs {
 		for _, result := range results {
-			if result.Site == site {
-				if result.Status != status {
-					tyme = time.Now()
+			if result.Site == rec.Site {
+				if result.Status != int(rec.Status) {
+					rec.Status = result.Status
+					rec.Time = time.Now()
 					output := message.Process(result.Site, result.Status, result.Misc)
-					go glob.Bot.Send(&tb.User{ID: chatID}, output, tb.ModeMarkdown)
+					go glob.Bot.Send(&tb.User{ID: int(rec.UserID)}, output, tb.ModeMarkdown)
 				}
-				record := []string{
-					site,
-					line[1],
-					line[2],
-					tyme.Format(layout),
-					strconv.Itoa(result.Status),
-				}
-				records = append(records, record)
+				linesOut = append(linesOut, rec.Marshall())
 			}
 		}
 	}
+	return
+}
 
-	file.WriteFileCSV(records, glob.File)
+// Unmarshall string to record
+func (rec *Record) Unmarshall(lineIn []string) (rx Record) {
+	rx.Site = lineIn[0]
+	rx.UserID, _ = strconv.Atoi(lineIn[1])
+	rx.MessageID, _ = strconv.Atoi(lineIn[2])
+	rx.Time, _ = time.Parse(layout, lineIn[3])
+	rx.Status, _ = strconv.Atoi(lineIn[4])
+	return
+}
+
+// Marshall to strings
+func (rec *Record) Marshall() []string {
+	return []string{
+		rec.Site,
+		strconv.Itoa(rec.UserID),
+		strconv.Itoa((int(rec.MessageID))),
+		rec.Time.Format(layout),
+		strconv.Itoa(int(rec.Status)),
+	}
 }
