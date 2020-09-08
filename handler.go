@@ -21,10 +21,9 @@ func (glob *Global) poll(freq string) {
 
 func (glob *Global) executePoll() {
 	lines, _ := file.ReadCSV(glob.File)
-	var records []Record
-	for _, line := range lines {
-		record := &Record{}
-		records = append(records, record.Unmarshall(line))
+	records := make([]Record, len(lines))
+	for i, line := range lines {
+		records[i].Unmarshall(line)
 	}
 	linesOut := glob.handleRecords(records)
 	file.WriteFileCSV(linesOut, glob.File)
@@ -54,13 +53,12 @@ func (glob *Global) handleRecords(recs []Record) (linesOut [][]string) {
 }
 
 // Unmarshall string to record
-func (rec *Record) Unmarshall(lineIn []string) (rx Record) {
-	rx.Site = lineIn[0]
-	rx.UserID, _ = strconv.Atoi(lineIn[1])
-	rx.MessageID, _ = strconv.Atoi(lineIn[2])
-	rx.Time, _ = time.Parse(layout, lineIn[3])
-	rx.Status, _ = strconv.Atoi(lineIn[4])
-	return
+func (rec *Record) Unmarshall(lineIn []string) {
+	rec.Site = lineIn[0]
+	rec.UserID, _ = strconv.Atoi(lineIn[1])
+	rec.MessageID, _ = strconv.Atoi(lineIn[2])
+	rec.Time, _ = time.Parse(layout, lineIn[3])
+	rec.Status, _ = strconv.Atoi(lineIn[4])
 }
 
 // Marshall to strings
