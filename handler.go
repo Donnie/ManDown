@@ -21,10 +21,12 @@ func (glob *Global) poll(freq string) {
 
 func (glob *Global) executePoll() {
 	lines, _ := file.ReadCSV(glob.File)
+
 	records := make([]Record, len(lines))
 	for i, line := range lines {
 		records[i].Unmarshall(line)
 	}
+
 	linesOut := glob.handleRecords(records)
 	file.WriteFileCSV(linesOut, glob.File)
 }
@@ -66,9 +68,9 @@ func (rec *Record) Marshall() []string {
 	return []string{
 		rec.Site,
 		strconv.Itoa(rec.UserID),
-		strconv.Itoa((int(rec.MessageID))),
+		strconv.Itoa(rec.MessageID),
 		rec.Time.Format(layout),
-		strconv.Itoa(int(rec.Status)),
+		strconv.Itoa(rec.Status),
 	}
 }
 
