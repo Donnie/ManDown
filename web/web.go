@@ -44,7 +44,7 @@ func GetStatus(site string, ch chan<- Health) {
 	}
 
 	c := &http.Client{
-		Timeout: time.Minute,
+		Timeout: time.Minute * 3,
 	}
 
 	resp, err := c.Get(web.String())

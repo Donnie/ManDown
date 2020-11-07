@@ -10,7 +10,6 @@ import (
 
 func (glob *Global) handleList(m *tb.Message) {
 	var records []Record
-	var output string
 	lines, _ := file.ReadCSV(glob.File)
 
 	for _, line := range lines {
@@ -22,9 +21,8 @@ func (glob *Global) handleList(m *tb.Message) {
 		records = append(records, rec)
 	}
 
-	if len(records) == 0 {
-		output = message.Template("emptylist")
-	} else {
+	output := message.Template("emptylist")
+	if len(records) != 0 {
 		output = message.Template("list")
 		for num, record := range records {
 			output += fmt.Sprintf("%d. `%s`\n", num+1, record.Site)

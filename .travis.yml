@@ -11,3 +11,8 @@ deploy:
     script: make deploy
     on:
         branch: master
+
+# whitelist
+branches:
+    only:
+        - master
