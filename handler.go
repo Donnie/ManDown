@@ -44,7 +44,7 @@ func (glob *Global) handleRecords(recs []Record) (linesOut [][]string) {
 			if result.Site == rec.Site {
 				if result.Status != rec.Status {
 					// ignore transport layer errors
-					if strings.Contains(result.Misc, "tcp") {
+					if strings.Contains(result.Misc, "read udp") {
 						continue
 					}
 					rec.Status = result.Status
