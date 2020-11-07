@@ -2,6 +2,7 @@ package main
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Donnie/ManDown/file"
@@ -42,6 +43,10 @@ func (glob *Global) handleRecords(recs []Record) (linesOut [][]string) {
 		for _, result := range results {
 			if result.Site == rec.Site {
 				if result.Status != rec.Status {
+					// ignore transport layer errors
+					if strings.Contains(result.Misc, "tcp") {
+						continue
+					}
 					rec.Status = result.Status
 					rec.Time = time.Now()
 					output := message.Process(result.Site, result.Status, result.Misc)
