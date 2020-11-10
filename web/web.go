@@ -14,6 +14,14 @@ type Health struct {
 	Misc   string
 }
 
+// IsAccepted : whether a site is accepted by this bot
+func (health *Health) IsAccepted() (out bool) {
+	if health.Status != 0 && health.Status != 1 {
+		out = true
+	}
+	return
+}
+
 // CheckBulk checks multiple domain healths at once
 func CheckBulk(sites []string) []Health {
 	ch := make(chan Health)
@@ -21,7 +29,7 @@ func CheckBulk(sites []string) []Health {
 
 	sites = deDupeStr(sites)
 	for _, site := range sites {
-		go GetStatus(site, ch)
+		go getStatus(site, ch)
 	}
 
 	for range sites {
@@ -31,8 +39,8 @@ func CheckBulk(sites []string) []Health {
 	return results
 }
 
-// GetStatus gets the Status code of a single website
-func GetStatus(site string, ch chan<- Health) {
+// getStatus gets the Status code of a single website
+func getStatus(site string, ch chan<- Health) {
 	web, err := url.ParseRequestURI(site)
 	if err != nil {
 		ch <- Health{
@@ -60,7 +68,6 @@ func GetStatus(site string, ch chan<- Health) {
 	status := resp.StatusCode
 	ch <- Health{
 		Site:   site,
-		Misc:   "",
 		Status: status,
 	}
 	return
@@ -69,7 +76,7 @@ func GetStatus(site string, ch chan<- Health) {
 // CheckHealth gets the Status code of one domain
 func CheckHealth(site string) Health {
 	ch := make(chan Health)
-	go GetStatus(site, ch)
+	go getStatus(site, ch)
 	result := <-ch
 
 	return result
@@ -91,19 +98,18 @@ func Sanitise(site string) string {
 }
 
 // deDupeStr takes an array of strings and returns only unique strings
-func deDupeStr(strs []string) []string {
-	deDuped := []string{}
+func deDupeStr(strs []string) (out []string) {
 	for _, item := range strs {
 		skip := false
-		for _, el := range deDuped {
+		for _, el := range out {
 			if el == item {
 				skip = true
 				break
 			}
 		}
 		if !skip && item != "" {
-			deDuped = append(deDuped, item)
+			out = append(out, item)
 		}
 	}
-	return deDuped
+	return out
 }

@@ -11,7 +11,7 @@ func (glob *Global) handleClear(m *tb.Message) {
 
 	for _, line := range lines {
 		rec := Record{}
-		rec.Unmarshall(line)
+		rec.Unmarshal(line)
 		if rec.UserID == m.Sender.ID {
 			continue
 		}

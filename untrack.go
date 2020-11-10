@@ -13,7 +13,7 @@ func (glob *Global) handleUntrack(m *tb.Message) {
 
 	for _, line := range lines {
 		rec := Record{}
-		rec.Unmarshall(line)
+		rec.Unmarshal(line)
 		if site == rec.Site && m.Sender.ID == rec.UserID {
 			continue
 		}

@@ -25,7 +25,7 @@ func (glob *Global) executePoll() {
 
 	records := make([]Record, len(lines))
 	for i, line := range lines {
-		records[i].Unmarshall(line)
+		records[i].Unmarshal(line)
 	}
 
 	linesOut := glob.handleRecords(records)
@@ -54,13 +54,13 @@ func (glob *Global) handleRecords(recs []Record) (linesOut [][]string) {
 				go glob.Bot.Send(&tb.User{ID: rec.UserID}, output, tb.ModeMarkdown)
 			}
 		}
-		linesOut = append(linesOut, rec.Marshall())
+		linesOut = append(linesOut, rec.Marshal())
 	}
 	return
 }
 
-// Unmarshall string to record
-func (rec *Record) Unmarshall(lineIn []string) {
+// Unmarshal string to record
+func (rec *Record) Unmarshal(lineIn []string) {
 	rec.Site = lineIn[0]
 	rec.UserID, _ = strconv.Atoi(lineIn[1])
 	rec.MessageID, _ = strconv.Atoi(lineIn[2])
@@ -68,8 +68,8 @@ func (rec *Record) Unmarshall(lineIn []string) {
 	rec.Status, _ = strconv.Atoi(lineIn[4])
 }
 
-// Marshall to strings
-func (rec *Record) Marshall() []string {
+// Marshal to strings
+func (rec *Record) Marshal() []string {
 	return []string{
 		rec.Site,
 		strconv.Itoa(rec.UserID),
@@ -83,7 +83,7 @@ func (rec *Record) Marshall() []string {
 func (rec *Record) ExistsIn(lines [][]string) bool {
 	for _, line := range lines {
 		exist := Record{}
-		exist.Unmarshall(line)
+		exist.Unmarshal(line)
 		if exist.Site == rec.Site && exist.UserID == rec.UserID {
 			return true
 		}
