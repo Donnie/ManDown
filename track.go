@@ -3,7 +3,6 @@ package main
 import (
 	"time"
 
-	"github.com/Donnie/ManDown/file"
 	"github.com/Donnie/ManDown/message"
 	"github.com/Donnie/ManDown/web"
 	tb "gopkg.in/tucnak/telebot.v2"
@@ -23,10 +22,6 @@ func (glob *Global) handleTrack(m *tb.Message) {
 			Time:      time.Now(),
 			Status:    check.Status,
 		}
-
-		lines, _ := file.ReadCSV(glob.File)
-		if !rec.ExistsIn(lines) {
-			file.WriteLineCSV(rec.Marshal(), glob.File)
-		}
+		rec.Put(glob.File)
 	}
 }

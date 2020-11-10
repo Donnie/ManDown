@@ -11,7 +11,11 @@ import (
 	tb "gopkg.in/tucnak/telebot.v2"
 )
 
-var layout = "2006-01-02 15:04:05"
+// Global holds app state
+type Global struct {
+	Bot  *tb.Bot
+	File string
+}
 
 func (glob *Global) poll(freq string) {
 	i, _ := strconv.Atoi(freq)
@@ -28,11 +32,11 @@ func (glob *Global) executePoll() {
 		records[i].Unmarshal(line)
 	}
 
-	linesOut := glob.handleRecords(records)
-	file.WriteFileCSV(linesOut, glob.File)
+	updated := glob.handleRecords(records)
+	file.WriteFileCSV(updated, glob.File)
 }
 
-func (glob *Global) handleRecords(recs []Record) (linesOut [][]string) {
+func (glob *Global) handleRecords(recs []Record) (updated [][]string) {
 	var sites []string
 	for _, rec := range recs {
 		sites = append(sites, rec.Site)
@@ -45,48 +49,19 @@ func (glob *Global) handleRecords(recs []Record) (linesOut [][]string) {
 			if strings.Contains(result.Misc, "read udp") {
 				continue
 			}
-			if result.Site == rec.Site &&
-				result.Status != rec.Status {
-				// if same site but different status
-				rec.Status = result.Status
-				rec.Time = time.Now()
-				output := message.Process(result.Site, result.Status, result.Misc)
-				go glob.Bot.Send(&tb.User{ID: rec.UserID}, output, tb.ModeMarkdown)
+			if result.Site == rec.Site {
+				if result.Status != rec.Status {
+					// if same site but different status
+					rec.Status = result.Status
+					rec.Time = time.Now()
+					output := message.Process(result.Site, result.Status, result.Misc)
+					go glob.Bot.Send(&tb.User{ID: rec.UserID}, output, tb.ModeMarkdown)
+				}
+				// skip other results if found
+				break
 			}
 		}
-		linesOut = append(linesOut, rec.Marshal())
+		updated = append(updated, rec.Marshal())
 	}
 	return
-}
-
-// Unmarshal string to record
-func (rec *Record) Unmarshal(lineIn []string) {
-	rec.Site = lineIn[0]
-	rec.UserID, _ = strconv.Atoi(lineIn[1])
-	rec.MessageID, _ = strconv.Atoi(lineIn[2])
-	rec.Time, _ = time.Parse(layout, lineIn[3])
-	rec.Status, _ = strconv.Atoi(lineIn[4])
-}
-
-// Marshal to strings
-func (rec *Record) Marshal() []string {
-	return []string{
-		rec.Site,
-		strconv.Itoa(rec.UserID),
-		strconv.Itoa(rec.MessageID),
-		rec.Time.Format(layout),
-		strconv.Itoa(rec.Status),
-	}
-}
-
-// ExistsIn if it already exists
-func (rec *Record) ExistsIn(lines [][]string) bool {
-	for _, line := range lines {
-		exist := Record{}
-		exist.Unmarshal(line)
-		if exist.Site == rec.Site && exist.UserID == rec.UserID {
-			return true
-		}
-	}
-	return false
 }
