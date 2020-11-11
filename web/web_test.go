@@ -67,7 +67,6 @@ func TestCheckHealth(t *testing.T) {
 
 	expected = Health{
 		Site:   "https://google.com",
-		Misc:   "",
 		Status: 200,
 	}
 	found = CheckHealth("https://google.com")
