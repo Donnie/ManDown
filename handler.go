@@ -25,6 +25,11 @@ func (glob *Global) poll(freq string) {
 }
 
 func (glob *Global) executePoll() {
+	if !glob.handleFaangCheck() {
+		// if internet not up then do nothing
+		return
+	}
+
 	lines, _ := file.ReadCSV(glob.File)
 
 	records := make([]Record, len(lines))
@@ -62,6 +67,27 @@ func (glob *Global) handleRecords(recs []Record) (updated [][]string) {
 			}
 		}
 		updated = append(updated, rec.Marshal())
+	}
+	return
+}
+
+func (glob *Global) handleFaangCheck() (up bool) {
+	// add FAANG
+	faang := []string{
+		"https://facebook.com",
+		"https://apple.com",
+		"https://amazon.com",
+		"https://netflix.com",
+		"https://google.com",
+	}
+	results := web.CheckBulk(faang)
+
+	// do FAANG check
+	for _, res := range results {
+		// even if one is online then internet is up
+		if res.Status == 200 {
+			up = true
+		}
 	}
 	return
 }
