@@ -16,6 +16,16 @@ Add your Telegram bot token to the .env file and then
 
 ```make dev```
 
+### Deploy
+Check `.travis.yml` file for deployment instructions for the CI
+
+```make deploy```
+
+### Go live
+The live command is severely customised to a certain setup, you might want to take a look and change it.
+
+```make live```
+
 ## Functions
 ### /track
 1. You send a message `/track donnieashok.in`

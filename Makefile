@@ -15,12 +15,12 @@ deploy: build
 	@echo "Deployed!"
 
 live:
-	ssh root@vultr docker pull donnieashok/mandown:prod
-	- ssh root@vultr docker stop mandown
-	- ssh root@vultr docker rm mandown
-	scp -r ./.env root@vultr:/root/
-	ssh root@vultr docker run -d --restart on-failure -v /home/mandown/:/db/ --env-file /root/.env --name mandown donnieashok/mandown:prod
-	ssh root@vultr rm /root/.env
+	ssh root@mandown docker pull donnieashok/mandown:prod
+	- ssh root@mandown docker stop mandown
+	- ssh root@mandown docker rm mandown
+	scp -r ./.env root@mandown:/root/
+	ssh root@mandown docker run -d --restart on-failure -v /home/mandown/:/db/ --env-file /root/.env --name mandown donnieashok/mandown:prod
+	ssh root@mandown rm /root/.env
 	@echo "Is live"
 
 publish: deploy live
