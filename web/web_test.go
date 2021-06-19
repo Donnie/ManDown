@@ -9,33 +9,55 @@ import (
 // TestSanitise tests scenarios where unwanted
 // characters are added to the URL
 func TestSanitise(t *testing.T) {
-	expected := ""
-	found := Sanitise("")
-	require.Equal(t, expected, found)
+	plain, ssl, err := Sanitise("")
+	require.EqualError(t, err, "web: input is empty")
+	require.Equal(t, "", plain)
+	require.Equal(t, "", ssl)
 
-	expected = ""
-	found = Sanitise("aaa$@%")
-	require.Equal(t, expected, found)
+	plain, ssl, err = Sanitise("aaa$@%")
+	require.Error(t, err)
+	require.Equal(t, "", plain)
+	require.Equal(t, "", ssl)
 
-	expected = "https://aaa"
-	found = Sanitise("aaa")
-	require.Equal(t, expected, found)
+	plain, ssl, err = Sanitise("aa@%$^a.com/page")
+	require.Error(t, err)
+	require.Equal(t, "", plain)
+	require.Equal(t, "", ssl)
 
-	expected = "https://aaa.com"
-	found = Sanitise("aaa.com")
-	require.Equal(t, expected, found)
+	plain, ssl, err = Sanitise("aaa")
+	require.EqualError(t, err, "web: input is incorrect")
+	require.Equal(t, "", plain)
+	require.Equal(t, "", ssl)
 
-	expected = "https://aaa.com"
-	found = Sanitise("aaa.com/page")
-	require.Equal(t, expected, found)
+	plain, ssl, err = Sanitise("aaa.com")
+	require.NoError(t, err)
+	require.Equal(t, "http://aaa.com", plain)
+	require.Equal(t, "https://aaa.com", ssl)
 
-	expected = "http://aaa.com"
-	found = Sanitise("http://aaa.com/page")
-	require.Equal(t, expected, found)
+	plain, ssl, err = Sanitise("aaa.com/page")
+	require.NoError(t, err)
+	require.Equal(t, "http://aaa.com", plain)
+	require.Equal(t, "https://aaa.com", ssl)
 
-	expected = ""
-	found = Sanitise("aa@%$^a.com/page")
-	require.Equal(t, expected, found)
+	plain, ssl, err = Sanitise("http://aaa.com/")
+	require.NoError(t, err)
+	require.Equal(t, "http://aaa.com", plain)
+	require.Equal(t, "", ssl) // http is mentioned
+
+	plain, ssl, err = Sanitise("http://aaa.com/page")
+	require.NoError(t, err)
+	require.Equal(t, "http://aaa.com", plain)
+	require.Equal(t, "", ssl) // http is mentioned
+
+	plain, ssl, err = Sanitise("https://aaa.com/")
+	require.NoError(t, err)
+	require.Equal(t, "", plain)
+	require.Equal(t, "https://aaa.com", ssl) // https is mentioned
+
+	plain, ssl, err = Sanitise("https://aaa.com/page")
+	require.NoError(t, err)
+	require.Equal(t, "", plain)
+	require.Equal(t, "https://aaa.com", ssl) // https is mentioned
 }
 
 func TestCheckHealth(t *testing.T) {
