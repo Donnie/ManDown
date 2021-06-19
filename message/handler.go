@@ -4,6 +4,13 @@ import (
 	"fmt"
 )
 
+// InputError processes error messages
+func InputError(err error) (output string) {
+	output = "Oops! That does not work.\n\n"
+	output += fmt.Sprintf("Error: `%s`", err.Error())
+	return
+}
+
 // Process to process Status codes
 func Process(site string, code int, msg string) (output string) {
 	output = fmt.Sprintf("Site: `%s`\n\n", site)
