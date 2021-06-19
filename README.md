@@ -30,6 +30,8 @@ The live command is severely customised to a certain setup, you might want to ta
 ### /track
 1. You send a message `/track donnieashok.in`
 2. The app checks for errors in the URL string
+    1. If you specify the scheme it sticks to the scheme
+    2. If you do not it adds both `http` and `https`
 3. If it is a fine URL then it looks up the HTTP status
 4. If it does not already exist in the tracked list it adds to the list
 
@@ -40,7 +42,10 @@ The live command is severely customised to a certain setup, you might want to ta
 
 ### /untrack
 1. You send a message `/untrack donnieashok.in`
-2. The app deletes the line from the csv file with your chat_id and site
+2. The app checks for errors in the URL string
+    1. If you specify the scheme it sticks to the scheme
+    2. If you do not it adds both `http` and `https`
+3. The app deletes the line from the csv file with your chat_id and site
 
 ### /list
 1. You send a message `/list`

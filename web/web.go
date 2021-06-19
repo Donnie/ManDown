@@ -1,10 +1,13 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/asaskevich/govalidator"
 )
 
 // Health struct to contain Health of site
@@ -83,18 +86,49 @@ func CheckHealth(site string) Health {
 }
 
 // Sanitise makes sure only the domain name gets through
-func Sanitise(site string) string {
-	web, err := url.Parse(strings.ToLower(site))
-	if err != nil || site == "" {
-		return ""
+// to prevent abuse by launching multiple requests
+// on a single website.
+func Sanitise(site string) (plain string, ssl string, err error) {
+	if site == "" {
+		// for empty input url.Parse does not throw an error
+		err = errors.New("web: input is empty")
+		return
 	}
 
-	if web.Scheme != "http" {
-		web.Scheme = "https"
+	site = strings.ToLower(site)
+	if !govalidator.IsURL(site) {
+		// for "google" input url.Parse does not throw an error
+		err = errors.New("web: input is incorrect")
+		return
 	}
 
-	web, _ = url.Parse(web.String())
-	return web.Scheme + "://" + web.Hostname()
+	// use url.Parse to get structured data from the input
+	web, _ := url.Parse(site)
+	if web.Host == "" {
+		// if scheme is not specified we assume http
+		web, _ = url.Parse("http://" + site)
+	}
+
+	// when https is specifically mentioned
+	// or when nothing is mentioned
+	// we add https
+	// i.e. when http is not specified
+	if !strings.Contains(site, "http://") {
+		ssl = "https://" + web.Host
+	}
+
+	// when http is specifically mentioned
+	// or when nothing is mentioned
+	// we add http
+	// i.e. when https is not specified
+	if !strings.Contains(site, "https://") {
+		plain = "http://" + web.Host
+	}
+
+	// i.e. when the schema is not input
+	// when http and https are both missing
+	// then we apply both http and https
+	return
 }
 
 // deDupeStr takes an array of strings and returns only unique strings

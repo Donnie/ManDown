@@ -9,7 +9,22 @@ import (
 )
 
 func (glob *Global) handleTrack(m *tb.Message) {
-	site := web.Sanitise(m.Payload)
+	var output string
+	plain, ssl, err := web.Sanitise(m.Payload)
+	if err != nil {
+		output = message.InputError(err)
+		go glob.Bot.Send(m.Sender, output, tb.ModeMarkdown)
+		return
+	}
+	if plain != "" {
+		glob.handleAdd(plain, m)
+	}
+	if ssl != "" {
+		glob.handleAdd(ssl, m)
+	}
+}
+
+func (glob *Global) handleAdd(site string, m *tb.Message) {
 	check := web.CheckHealth(site)
 	output := message.Process(check.Site, check.Status, check.Misc)
 	go glob.Bot.Send(m.Sender, output, tb.ModeMarkdown)
