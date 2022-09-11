@@ -1,26 +1,19 @@
 dev:
 	goreload .
 
-build:
-	@echo "Building for prod"
-	docker build -t donnieashok/mandown:prod .
-
 up:
 	@echo "Running for Prod"
 	docker run -dit --restart on-failure --name mandown donnieashok/mandown:prod
 
-deploy: build
-	echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
-	docker push donnieashok/mandown:prod
-	@echo "Deployed!"
-
 live:
-	ssh root@mandown docker pull donnieashok/mandown:prod
-	- ssh root@mandown docker stop mandown
-	- ssh root@mandown docker rm mandown
-	scp -r ./.env root@mandown:/root/
-	ssh root@mandown docker run -d --restart on-failure -v /home/mandown/:/db/ --env-file /root/.env --name mandown donnieashok/mandown:prod
-	ssh root@mandown rm /root/.env
+	ssh donnie@mandown sudo docker pull donnieashok/mandown:prod
+	- ssh donnie@mandown sudo docker stop mandown
+	- ssh donnie@mandown sudo docker rm mandown
+	ssh donnie@mandown 'mkdir -p ~/mandown/db'
+	scp ./.env donnie@mandown:~/mandown/.env
+	# scp ./db/db.csv donnie@mandown:~/mandown/db/db.csv
+	ssh donnie@mandown 'sudo docker run -d --restart on-failure -v ~/mandown/db:/db/ --env-file ~/mandown/.env --name mandown donnieashok/mandown:prod'
+	ssh donnie@mandown 'rm ~/mandown/.env'
 	@echo "Is live"
 
 publish: deploy live
