@@ -1,0 +1,17 @@
+# 1. rename .env.dist to .env and change values
+# 2. change your volume path to whereever you want to store it
+
+version: '3'
+
+services:
+  mandown:
+    container_name: mandown #change the name to whatever you want 
+    build: 
+      context: . 
+    restart: always
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - FREQ=${FREQ}
+      - DBFILE=${DBFILE}
+    volumes:
+      - /change/local/volume/path/db:/db #maps your database
