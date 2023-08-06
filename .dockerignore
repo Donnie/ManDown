@@ -1,7 +1,0 @@
-.dockerignore
-.env
-.env.local
-db
-.git
-main
-*.csv

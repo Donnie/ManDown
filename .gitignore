@@ -4,3 +4,4 @@ db
 main
 *.csv
 .goreload
+/target
