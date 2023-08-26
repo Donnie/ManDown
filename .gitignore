@@ -5,3 +5,4 @@ main
 *.csv
 .goreload
 /target
+.vscode
