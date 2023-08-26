@@ -7,6 +7,8 @@ use data::write_csv;
 
 use csv::Error;
 use std::path::Path;
+use tokio::time;
+use dotenv::dotenv;
 
 // Function to process CSV
 async fn check_records(filename: &str) -> Result<(), Error> {
@@ -24,17 +26,28 @@ async fn check_records(filename: &str) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() {
-    let filename = "db/db.csv";
+    dotenv().ok();
+
+    let filename = dotenv::var("DBFILE").unwrap_or("db/db.csv".to_string());
+    let interval: u64 = dotenv::var("FREQ")
+        .unwrap_or("600".to_string())
+        .parse()
+        .expect("Interval must be a number");
 
     // Check that the file exists
-    if !Path::new(filename).exists() {
+    if !Path::new(&filename).exists() {
         println!("The file {} does not exist", filename);
         return;
     }
 
-    // Process the CSV file
-    match check_records(filename).await {
-        Ok(_) => println!("CSV file updated successfully!"),
-        Err(e) => println!("Error processing CSV file: {:?}", e),
+    let mut interval = time::interval(time::Duration::from_secs(interval));
+  
+    loop {
+        interval.tick().await;
+  
+        match check_records(&filename).await {
+            Ok(_) => println!("CSV file updated successfully!"), 
+            Err(e) => println!("Error processing CSV file: {:?}", e),
+        }
     }
 }
