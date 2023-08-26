@@ -9,12 +9,12 @@ use csv::Error;
 use std::path::Path;
 
 // Function to process CSV
-fn check_records(filename: &str) -> Result<(), Error> {
+async fn check_records(filename: &str) -> Result<(), Error> {
     // Read from CSV
     let mut records = read_csv(filename)?;
 
     // Update HTTP status of each website
-    update_http_status(&mut records);
+    update_http_status(&mut records).await;
 
     // Write updated records back to CSV
     write_csv(filename, records)?;
@@ -22,7 +22,8 @@ fn check_records(filename: &str) -> Result<(), Error> {
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let filename = "db/db.csv";
 
     // Check that the file exists
@@ -32,7 +33,7 @@ fn main() {
     }
 
     // Process the CSV file
-    match check_records(filename) {
+    match check_records(filename).await {
         Ok(_) => println!("CSV file updated successfully!"),
         Err(e) => println!("Error processing CSV file: {:?}", e),
     }
