@@ -1,6 +1,9 @@
 mod poll;
 use poll::run_poll;
 
+mod about;
+use about::handle_about;
+
 mod data;
 mod http;
 
@@ -11,18 +14,63 @@ use teloxide::{prelude::*, utils::command::BotCommands};
 use teloxide::repls::CommandReplExt;
 
 #[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase", description = "These commands are supported:")]
+#[command(rename_rule = "lowercase", description = "I can understand these commands")]
 enum Command {
+    #[command(description = "About ManDown")]
+    About,
+    #[command(description = "handle a website.")]
+    Clear,
     #[command(description = "I am here to help!")]
     Help,
+    #[command(description = "handle a website.")]
+    List,
+    #[command(description = "I am here to help!")]
+    Start,
+    #[command(description = "handle a website.")]
+    Track(String),
+    #[command(description = "handle a website.")]
+    Untrack(String),
 }
 
 async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
     match cmd {
-        Command::Help => bot.send_message(
+        Command::About => handle_about(bot, msg).await?,
+        Command::Clear => {
+            bot.send_message(
+                msg.chat.id,
+                Command::descriptions().to_string(),
+            ).await?;
+        }
+        Command::Help => {
+            bot.send_message(
             msg.chat.id,
             Command::descriptions().to_string(),
-        ).await?,
+        ).await?;
+        }
+        Command::List => {
+            bot.send_message(
+            msg.chat.id,
+            Command::descriptions().to_string(),
+        ).await?;
+        }
+        Command::Start => {
+            bot.send_message(
+            msg.chat.id,
+            Command::descriptions().to_string(),
+        ).await?;
+        }
+        Command::Track(website) => {
+            bot.send_message(
+                msg.chat.id,
+                format!("{website}"),
+            ).await?;
+        }
+        Command::Untrack(website) => {
+            bot.send_message(
+                msg.chat.id,
+                format!("{website}"),
+            ).await?;
+        }
     };
     Ok(())
 }
