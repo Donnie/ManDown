@@ -1,5 +1,3 @@
-
-
 use teloxide::prelude::*;
 
 pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {

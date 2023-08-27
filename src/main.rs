@@ -1,17 +1,24 @@
 mod poll;
-use poll::run_poll;
+use poll::checkup;
 
 mod about;
 use about::handle_about;
 
+mod list;
+use list::handle_list;
+
 mod data;
 mod http;
 
-use std::path::Path;
 use dotenv::dotenv;
+use std::path::Path;
+use std::sync::Arc;
 
-use teloxide::{prelude::*, utils::command::BotCommands};
-use teloxide::repls::CommandReplExt;
+use teloxide::{
+    prelude::*,
+    repls::CommandReplExt,
+    utils::command::BotCommands,
+};
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "I can understand these commands")]
@@ -32,7 +39,7 @@ enum Command {
     Untrack(String),
 }
 
-async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
+async fn answer(bot: Bot, msg: Message, cmd: Command, filename: Arc<String>) -> ResponseResult<()> {
     match cmd {
         Command::About => handle_about(bot, msg).await?,
         Command::Clear => {
@@ -47,12 +54,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             Command::descriptions().to_string(),
         ).await?;
         }
-        Command::List => {
-            bot.send_message(
-            msg.chat.id,
-            Command::descriptions().to_string(),
-        ).await?;
-        }
+        Command::List => handle_list(bot, msg, &*filename).await?,
         Command::Start => {
             bot.send_message(
             msg.chat.id,
@@ -75,26 +77,37 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
     Ok(())
 }
 
+// Use the Tokio runtime for asynchronous execution
 #[tokio::main]
 async fn main() {
+    // Load environment variables from a `.env` file if it exists
     dotenv().ok();
 
-    let filename = dotenv::var("DBFILE").unwrap_or("db/db.csv".to_string());
+    // Get the database filename from the environment variable or use a default value
+    let filename = Arc::new(dotenv::var("DBFILE").unwrap_or("db/db.csv".to_string()));
+
+    // Get the polling frequency from the environment variable or use a default value
     let interval: u64 = dotenv::var("FREQ")
         .unwrap_or("600".to_string())
         .parse()
         .expect("FREQ must be a number");
 
-    // Check that the file exists
-    if !Path::new(&filename).exists() {
+    // Clone the filename for use in the asynchronous block
+    let dbfile = filename.clone();
+
+    // Ensure the database file exists before proceeding
+    if !Path::new(&*filename).exists() {
         panic!("The DBFILE {} does not exist", filename);
     }
 
-    // Start polling function
+    // Start the polling function in the background
     tokio::spawn(async move {
-        run_poll(filename, interval).await;
+        checkup(dbfile.to_string(), interval).await;
     });
 
+    // Initialize the bot from environment variables
     let bot = Bot::from_env();
-    Command::repl(bot, answer).await;
+
+    // Start the bot's command loop
+    Command::repl(bot, move |bot, msg, cmd| answer(bot, msg, cmd, filename.clone())).await;
 }

@@ -5,7 +5,7 @@ use crate::data::write_csv;
 use csv::Error;
 use tokio::time;
 
-pub async fn run_poll(filename: String, interval: u64) {
+pub async fn checkup(filename: String, interval: u64) {
     loop {
         match check_records(&filename).await {
             Ok(_) => println!("CSV file updated successfully!"), 
