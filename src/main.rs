@@ -40,14 +40,12 @@ async fn main() {
         return;
     }
 
-    let mut interval = time::interval(time::Duration::from_secs(interval));
-  
     loop {
-        interval.tick().await;
-  
         match check_records(&filename).await {
             Ok(_) => println!("CSV file updated successfully!"), 
             Err(e) => println!("Error processing CSV file: {:?}", e),
         }
+
+        tokio::time::sleep(time::Duration::from_secs(interval)).await;
     }
 }
