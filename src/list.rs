@@ -19,7 +19,7 @@ pub async fn handle_list(bot: Bot, msg: Message, filename: &str) -> ResponseResu
         .collect::<Vec<&str>>()
         .join("\n");
     
-    let output = format!("Here are your tracked <b>domains</b>:\n\n<pre>{}</pre>", websites);
+    let output = format!("Here are your tracked domains:\n\n<pre>{}</pre>", websites);
     
     bot.send_message(msg.chat.id, output).parse_mode(ParseMode::Html).await?;
     
