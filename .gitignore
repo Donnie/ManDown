@@ -6,3 +6,4 @@ main
 .goreload
 /target
 .vscode
+.DS_Store

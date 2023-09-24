@@ -10,6 +10,8 @@ use list::handle_list;
 mod data;
 mod http;
 
+use diesel::{prelude::*, sqlite::SqliteConnection};
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenv::dotenv;
 use std::path::Path;
 use std::sync::Arc;
@@ -25,17 +27,17 @@ use teloxide::{
 enum Command {
     #[command(description = "About ManDown")]
     About,
-    #[command(description = "handle a website.")]
+    #[command(description = "Clear your list of your followed domains")]
     Clear,
     #[command(description = "I am here to help!")]
     Help,
-    #[command(description = "handle a website.")]
+    #[command(description = "Get a list of your followed domains")]
     List,
     #[command(description = "I am here to help!")]
     Start,
-    #[command(description = "handle a website.")]
+    #[command(description = "Add to the list of tracked websites")]
     Track(String),
-    #[command(description = "handle a website.")]
+    #[command(description = "Remove from the list of tracked websites")]
     Untrack(String),
 }
 
@@ -77,6 +79,18 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, filename: Arc<String>) -> 
     Ok(())
 }
 
+pub fn establish_connection() -> SqliteConnection {
+    dotenv().ok();
+
+    let database_url = dotenv::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set");
+
+    SqliteConnection::establish(&database_url)
+        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
+}
+
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
 // Use the Tokio runtime for asynchronous execution
 #[tokio::main]
 async fn main() {
@@ -85,6 +99,10 @@ async fn main() {
 
     // Get the database filename from the environment variable or use a default value
     let filename = Arc::new(dotenv::var("DBFILE").unwrap_or("db/db.csv".to_string()));
+    
+    let mut conn = establish_connection();
+
+    conn.run_pending_migrations(MIGRATIONS).expect("Failed to apply database migrations");
 
     // Get the polling frequency from the environment variable or use a default value
     let interval: u64 = dotenv::var("FREQ")
