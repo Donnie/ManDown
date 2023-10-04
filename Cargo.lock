@@ -757,6 +757,7 @@ dependencies = [
  "serde_derive",
  "teloxide",
  "tokio",
+ "url",
 ]
 
 [[package]]

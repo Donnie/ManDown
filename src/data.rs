@@ -1,5 +1,6 @@
 use crate::schema::{Website, User};
 use diesel::{prelude::*, sqlite::SqliteConnection, dsl::*};
+use url::Url;
 
 pub fn get_all_websites(conn: &mut SqliteConnection) -> Result<Vec<Website>, diesel::result::Error> {
     use crate::schema::websites::dsl::*;
@@ -78,4 +79,29 @@ pub fn write_all_websites(conn: &mut SqliteConnection, webs: Vec<Website>) -> Re
     sql_query(sql).execute(conn)?;
 
     Ok(webs)
+}
+
+fn try_parse_url(input: &str) -> Option<Url> {
+    Url::parse(input).or_else(|_| Url::parse(&format!("http://{}", input))).ok()
+}
+
+pub fn extract_hostname(input: &str) -> String {
+    let host = try_parse_url(input)
+        .and_then(|url| url.host_str().map(|s| s.to_string()))
+        .unwrap_or_else(|| "".to_string());
+
+    // Ensure that the host contains a dot (indicating presence of a TLD)
+    if host.contains('.') {
+        host
+    } else {
+        "".to_string()
+    }
+}
+
+pub fn read_url(input: &str) -> (bool, String, String) {
+    let url = extract_hostname(input);
+    if url == "" {
+        return (false, "".to_string(), "".to_string())
+    }
+    return (true, format!("http://{}", url), format!("https://{}", url))
 }

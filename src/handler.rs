@@ -1,6 +1,7 @@
 use teloxide::{prelude::*, types::ParseMode};
+use crate::data::read_url;
 use crate::{data::list_websites_by_user, establish_connection};
-use crate::http::{get_status};
+use crate::http::get_status;
 use crate::alert::process;
 
 pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
@@ -35,13 +36,20 @@ pub async fn handle_list(bot: Bot, msg: Message) -> ResponseResult<()> {
 }
 
 pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseResult<()> {
-    let mut conn = establish_connection();
+    // let mut conn = establish_connection();
 
-    
+    let (valid, normal, ssl) = read_url(&website);
+    if !valid {
+        bot.send_message(msg.chat.id, format!("Invalid URL!")).parse_mode(ParseMode::Html).await?;
+        return Ok(());
+    }
 
-    let status = get_status(&website).await?;            
-    let message = process(&website, status as i32);
+    let normal_status = get_status(&normal).await?;
+    let message = process(&normal, normal_status as i32);
+    bot.send_message(msg.chat.id, message).parse_mode(ParseMode::Html).await?;
 
+    let ssl_status = get_status(&ssl).await?;
+    let message = process(&ssl, ssl_status as i32);
     bot.send_message(msg.chat.id, message).parse_mode(ParseMode::Html).await?;
 
     Ok(())

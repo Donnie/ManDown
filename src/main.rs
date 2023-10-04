@@ -8,6 +8,7 @@ mod alert;
 mod data;
 mod http;
 mod schema;
+mod tests;
 
 use diesel::{prelude::*, sqlite::SqliteConnection};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
