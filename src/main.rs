@@ -4,6 +4,8 @@ use poll::check_urls;
 mod about;
 use about::handle_about;
 
+mod alert;
+
 mod list;
 use list::handle_list;
 
@@ -106,13 +108,14 @@ async fn main() {
         .parse()
         .expect("FREQ must be a number");
 
-    // Start the polling function in the background
-    tokio::spawn(async move {
-        check_urls(&mut conn, interval).await;
-    });
-
     // Initialize the bot from environment variables
     let bot = Bot::from_env();
+
+    // Start the polling function in the background
+    let bot_clone = bot.clone();
+    tokio::spawn(async move {
+        check_urls(&mut conn, interval, bot_clone).await;
+    });
 
     // Start the bot's command loop
     Command::repl(bot, answer).await;

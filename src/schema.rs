@@ -39,8 +39,8 @@ diesel::allow_tables_to_appear_in_same_query!(
 #[derive(Queryable, Clone)]
 pub struct User {
     pub id: i32,
-    pub name: String,
-    pub plan_type: String,
+    pub name: Option<String>,
+    pub plan_type: Option<String>,
     pub telegram_id: i32,
 }
 

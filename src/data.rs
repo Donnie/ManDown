@@ -1,4 +1,4 @@
-use crate::schema::Website;
+use crate::schema::{Website, User};
 use diesel::{prelude::*, sqlite::SqliteConnection, dsl::*};
 
 pub fn get_all_websites(conn: &mut SqliteConnection) -> Result<Vec<Website>, diesel::result::Error> {
@@ -22,6 +22,19 @@ pub async fn list_websites_by_user(conn: &mut SqliteConnection, telegram_id: i32
         .load(conn)?;
 
     Ok(webs)
+}
+
+pub async fn list_users_by_website(conn: &mut SqliteConnection, website_id: i32) -> Result<Vec<User>, diesel::result::Error> {
+    use crate::schema::users::dsl::{users, id as uid, name, plan_type, telegram_id as tele_id};
+    use crate::schema::user_websites::dsl::{user_websites, website_id as wid, user_id};
+
+    let uss: Vec<User> = user_websites
+        .filter(wid.eq(website_id))
+        .inner_join(users.on(user_id.eq(uid)))
+        .select((uid, name, plan_type, tele_id))
+        .load(conn)?;
+
+    Ok(uss)
 }
 
 pub fn compare_websites(conn: &mut SqliteConnection, webs: Vec<Website>) -> Result<Vec<Website>, diesel::result::Error> {
