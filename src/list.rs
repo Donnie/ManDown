@@ -1,14 +1,9 @@
 use teloxide::{prelude::*, types::ParseMode};
-use crate::data::read_csv;
+use crate::data::get_all_websites;
+use diesel::sqlite::SqliteConnection;
 
-pub async fn handle_list(bot: Bot, msg: Message, filename: &str) -> ResponseResult<()> {
-    let records = match read_csv(filename) {
-        Ok(records) => records,
-        Err(error) => {
-            bot.send_message(msg.chat.id, format!("Failed to read records: {}", error)).await?;
-            return Ok(());
-        }
-    };
+pub async fn handle_list(bot: Bot, msg: Message, conn: &mut SqliteConnection) -> ResponseResult<()> {
+    let records = get_all_websites(conn);
     
     let user_id = msg.from().unwrap().id.0 as usize;
     

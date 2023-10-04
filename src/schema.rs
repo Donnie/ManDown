@@ -35,3 +35,25 @@ diesel::allow_tables_to_appear_in_same_query!(
     users,
     websites,
 );
+
+#[derive(Queryable, Clone)]
+pub struct User {
+    pub id: i32,
+    pub name: String,
+    pub plan_type: String,
+    pub telegram_id: String,
+}
+
+#[derive(Queryable, Clone)]
+pub struct Website {
+    pub id: i32,
+    pub last_checked_time: String,
+    pub status: i32,
+    pub url: String,
+}
+
+#[derive(Queryable, Clone)]
+pub struct UserWebsite {
+    pub user_id: i32,
+    pub website_id: i32,
+}

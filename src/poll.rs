@@ -1,23 +1,36 @@
-use crate::schema;
+use std::process::exit;
+
+use crate::http::update_http_status;
+use crate::data::{get_all_websites, compare_websites, write_all_websites};
 use tokio::time;
-use diesel::{prelude::*, sqlite::SqliteConnection};
+use diesel::sqlite::SqliteConnection;
 
 pub async fn check_urls(conn: &mut SqliteConnection, interval: u64) {
     loop {
-        let urls = get_all_urls(conn).expect("Error fetching URLs");
-        println!("Checking {} URLs...", urls.len());
-        
+        check_websites(conn).await;
         tokio::time::sleep(time::Duration::from_secs(interval)).await;
     }
 }
 
-fn get_all_urls(conn: &mut SqliteConnection) -> Result<Vec<String>, diesel::result::Error> {
-    use schema::websites::dsl as websites_dsl;
+// Function to process DB
+async fn check_websites(conn: &mut SqliteConnection) {
+    // Read from DB
+    let mut webs = get_all_websites(conn).expect("Error listing Websites");
+    println!("Checking {} Websites...", webs.len());
 
-    // Fetch all the URLs from the websites table
-    let urls: Vec<String> = websites_dsl::websites
-        .select(websites_dsl::url)
-        .load(conn)?;
+    // Update HTTP status of each website
+    update_http_status(&mut webs).await;
 
-    Ok(urls)
+    let changed_webs = compare_websites(conn, webs).expect("Error comparing Websites");
+    let web_count: usize = changed_webs.len();
+    println!("Changed {} Websites.", web_count.clone());
+
+    if web_count == 0 {
+        println!("No websites changed, skipping database update");
+        exit(0x0100);
+    }
+
+    // Write updated websites back to DB
+    write_all_websites(conn, changed_webs).expect("Error updating Websites");
+    println!("Updated all Websites.");
 }

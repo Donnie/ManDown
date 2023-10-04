@@ -4,9 +4,6 @@ use poll::check_urls;
 mod about;
 use about::handle_about;
 
-mod list;
-use list::handle_list;
-
 mod data;
 mod http;
 mod schema;
@@ -14,7 +11,6 @@ mod schema;
 use diesel::{prelude::*, sqlite::SqliteConnection};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenv::dotenv;
-use std::sync::Arc;
 
 use teloxide::{
     prelude::*,
@@ -31,8 +27,8 @@ enum Command {
     Clear,
     #[command(description = "I am here to help!")]
     Help,
-    #[command(description = "Get a list of your followed domains")]
-    List,
+    // #[command(description = "Get a list of your followed domains")]
+    // List,
     #[command(description = "I am here to help!")]
     Start,
     #[command(description = "Add to the list of tracked websites")]
@@ -41,7 +37,7 @@ enum Command {
     Untrack(String),
 }
 
-async fn answer(bot: Bot, msg: Message, cmd: Command, filename: Arc<String>) -> ResponseResult<()> {
+async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
     match cmd {
         Command::About => handle_about(bot, msg).await?,
         Command::Clear => {
@@ -56,7 +52,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, filename: Arc<String>) -> 
             Command::descriptions().to_string(),
         ).await?;
         }
-        Command::List => handle_list(bot, msg, &*filename).await?,
+        // Command::List => handle_list(bot, msg, &mut conn).await?,
         Command::Start => {
             bot.send_message(
             msg.chat.id,
@@ -97,9 +93,6 @@ async fn main() {
     // Load environment variables from a `.env` file if it exists
     dotenv().ok();
 
-    // Get the database filename from the environment variable or use a default value
-    let filename = Arc::new(dotenv::var("DBFILE").unwrap_or("db/db.csv".to_string()));
-    
     let mut conn = establish_connection();
 
     conn.run_pending_migrations(MIGRATIONS).expect("Failed to apply database migrations");
@@ -119,5 +112,5 @@ async fn main() {
     let bot = Bot::from_env();
 
     // Start the bot's command loop
-    Command::repl(bot, move |bot, msg, cmd| answer(bot, msg, cmd, filename.clone())).await;
+    Command::repl(bot, move |bot, msg, cmd| answer(bot, msg, cmd)).await;
 }
