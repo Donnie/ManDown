@@ -1,11 +1,27 @@
-use crate::schema::{websites, Website};
+use crate::schema::Website;
 use diesel::{prelude::*, sqlite::SqliteConnection, dsl::*};
 
 pub fn get_all_websites(conn: &mut SqliteConnection) -> Result<Vec<Website>, diesel::result::Error> {
+    use crate::schema::websites::dsl::*;
     // Fetch all the Websites from the websites table
-    let websites: Vec<Website> = websites::dsl::websites.load(conn)?;
+    let webs: Vec<Website> = websites.load(conn)?;
 
-    Ok(websites)
+    Ok(webs)
+}
+
+pub async fn list_websites_by_user(conn: &mut SqliteConnection, telegram_id: i32) -> Result<Vec<Website>, diesel::result::Error> {
+    use crate::schema::users::dsl::{users, id as uid, telegram_id as tele_id};
+    use crate::schema::user_websites::dsl::*;
+    use crate::schema::websites::dsl::{websites, id as wid, last_checked_time, status, url};
+
+    let webs: Vec<Website> = users
+        .inner_join(user_websites.on(user_id.eq(uid)))
+        .inner_join(websites.on(wid.eq(website_id)))
+        .filter(tele_id.eq(telegram_id))
+        .select((wid, last_checked_time, status, url))
+        .load(conn)?;
+
+    Ok(webs)
 }
 
 pub fn compare_websites(conn: &mut SqliteConnection, webs: Vec<Website>) -> Result<Vec<Website>, diesel::result::Error> {

@@ -4,6 +4,9 @@ use poll::check_urls;
 mod about;
 use about::handle_about;
 
+mod list;
+use list::handle_list;
+
 mod data;
 mod http;
 mod schema;
@@ -27,8 +30,8 @@ enum Command {
     Clear,
     #[command(description = "I am here to help!")]
     Help,
-    // #[command(description = "Get a list of your followed domains")]
-    // List,
+    #[command(description = "Get a list of your followed domains")]
+    List,
     #[command(description = "I am here to help!")]
     Start,
     #[command(description = "Add to the list of tracked websites")]
@@ -52,7 +55,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             Command::descriptions().to_string(),
         ).await?;
         }
-        // Command::List => handle_list(bot, msg, &mut conn).await?,
+        Command::List => handle_list(bot, msg).await?,
         Command::Start => {
             bot.send_message(
             msg.chat.id,
@@ -112,5 +115,5 @@ async fn main() {
     let bot = Bot::from_env();
 
     // Start the bot's command loop
-    Command::repl(bot, move |bot, msg, cmd| answer(bot, msg, cmd)).await;
+    Command::repl(bot, answer).await;
 }

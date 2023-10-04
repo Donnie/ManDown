@@ -1,16 +1,15 @@
 use teloxide::{prelude::*, types::ParseMode};
-use crate::data::get_all_websites;
-use diesel::sqlite::SqliteConnection;
+use crate::{data::list_websites_by_user, establish_connection};
 
-pub async fn handle_list(bot: Bot, msg: Message, conn: &mut SqliteConnection) -> ResponseResult<()> {
-    let records = get_all_websites(conn);
+pub async fn handle_list(bot: Bot, msg: Message) -> ResponseResult<()> {
+    let mut conn = establish_connection();
+    let telegram_id = msg.from().unwrap().id.0 as i32;
+    let webs = list_websites_by_user(&mut conn, telegram_id).await
+        .expect("Error listing Websites");
     
-    let user_id = msg.from().unwrap().id.0 as usize;
-    
-    let websites = records
+    let websites = webs
         .iter()
-        .filter(|r| r.user == user_id)
-        .map(|record| record.website.as_str())
+        .map(|record| record.url.as_str())
         .collect::<Vec<&str>>()
         .join("\n");
     

@@ -2,7 +2,7 @@ CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT,
   plan_type TEXT,
-  telegram_id TEXT UNIQUE
+  telegram_id INTEGER UNIQUE
 );
 
 CREATE TABLE websites (

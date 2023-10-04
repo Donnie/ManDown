@@ -14,7 +14,7 @@ diesel::table! {
         id -> Integer,
         name -> Nullable<Text>,
         plan_type -> Nullable<Text>,
-        telegram_id -> Text,
+        telegram_id -> Integer,
     }
 }
 
@@ -41,7 +41,7 @@ pub struct User {
     pub id: i32,
     pub name: String,
     pub plan_type: String,
-    pub telegram_id: String,
+    pub telegram_id: i32,
 }
 
 #[derive(Queryable, Clone)]
