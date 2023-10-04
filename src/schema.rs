@@ -1,27 +1,29 @@
+use diesel::Queryable;
+
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
     user_websites (user_id, website_id) {
-        user_id -> Nullable<Integer>,
-        website_id -> Nullable<Integer>,
-        last_checked_time -> Nullable<Text>,
+        user_id -> Integer,
+        website_id -> Integer,
     }
 }
 
 diesel::table! {
-    users (user_id) {
-        user_id -> Nullable<Integer>,
+    users (id) {
+        id -> Integer,
         name -> Nullable<Text>,
         plan_type -> Nullable<Text>,
-        telegram_id -> Nullable<Text>,
+        telegram_id -> Text,
     }
 }
 
 diesel::table! {
-    websites (website_id) {
-        website_id -> Nullable<Integer>,
-        status -> Nullable<Integer>,
-        url -> Nullable<Binary>,
+    websites (id) {
+        id -> Integer,
+        last_checked_time -> Text,
+        status -> Integer,
+        url -> Text,
     }
 }
 

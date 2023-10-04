@@ -1,23 +1,23 @@
 CREATE TABLE users (
-  user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT,
   plan_type TEXT,
-  telegram_id TEXT
+  telegram_id TEXT UNIQUE
 );
 
 CREATE TABLE websites (
-  website_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  last_checked_time TEXT,
   status INTEGER,
-  url UNIQUE
+  url TEXT UNIQUE
 );
 
 CREATE TABLE user_websites (
   user_id INTEGER, 
   website_id INTEGER,
-  last_checked_time TEXT,
   
-  FOREIGN KEY (user_id) REFERENCES users(user_id),
-  FOREIGN KEY (website_id) REFERENCES websites(website_id),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (website_id) REFERENCES websites(id),
   
   PRIMARY KEY (user_id, website_id)
 );

@@ -1,5 +1,5 @@
 mod poll;
-use poll::checkup;
+use poll::check_urls;
 
 mod about;
 use about::handle_about;
@@ -9,11 +9,11 @@ use list::handle_list;
 
 mod data;
 mod http;
+mod schema;
 
 use diesel::{prelude::*, sqlite::SqliteConnection};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenv::dotenv;
-use std::path::Path;
 use std::sync::Arc;
 
 use teloxide::{
@@ -110,17 +110,9 @@ async fn main() {
         .parse()
         .expect("FREQ must be a number");
 
-    // Clone the filename for use in the asynchronous block
-    let dbfile = filename.clone();
-
-    // Ensure the database file exists before proceeding
-    if !Path::new(&*filename).exists() {
-        panic!("The DBFILE {} does not exist", filename);
-    }
-
     // Start the polling function in the background
     tokio::spawn(async move {
-        checkup(dbfile.to_string(), interval).await;
+        check_urls(&mut conn, interval).await;
     });
 
     // Initialize the bot from environment variables
