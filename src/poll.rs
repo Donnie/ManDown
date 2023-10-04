@@ -1,5 +1,3 @@
-use std::process::exit;
-
 use crate::http::update_http_status;
 use crate::data::{get_all_websites, compare_websites, write_all_websites};
 use tokio::time;
@@ -25,12 +23,12 @@ async fn check_websites(conn: &mut SqliteConnection) {
     let web_count: usize = changed_webs.len();
     println!("Changed {} Websites.", web_count.clone());
 
-    if web_count == 0 {
+    if web_count.clone() == 0 {
         println!("No websites changed, skipping database update");
-        exit(0x0100);
+        return
     }
 
     // Write updated websites back to DB
-    write_all_websites(conn, changed_webs).expect("Error updating Websites");
-    println!("Updated all Websites.");
+    write_all_websites(conn, changed_webs.clone()).expect("Error updating Websites");
+    println!("Updated {} Websites.", web_count.clone());
 }
