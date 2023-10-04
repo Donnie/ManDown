@@ -26,16 +26,16 @@ async fn update_web_status(web: &mut Website) {
     web.last_checked_time = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
 
     match get_status(&web.url).await {
-        Ok(status) => web.status = status,
+        Ok(status) => web.status = status as i32,
         Err(_e) => web.status = 0,
     }
 }
 
-async fn get_status(url: &str) -> Result<i32, reqwest::Error> {
+pub async fn get_status(url: &str) -> Result<u16, reqwest::Error> {
     let client = reqwest::Client::new();
     let res = client.get(url).send().await?;
 
-    Ok(res.status().as_u16() as i32)
+    Ok(res.status().as_u16())
 }
 
 async fn has_internet_connection() -> bool {

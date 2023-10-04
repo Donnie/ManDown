@@ -24,7 +24,7 @@ pub async fn notify_user(conn: &mut SqliteConnection, bot: Bot, changed_webs: Ve
     }
 }
 
-fn process(site: &str, code: i32) -> String {
+pub fn process(site: &str, code: i32) -> String {
     let mut output = format!("Site: {}\n\n", site);
     
     match code {

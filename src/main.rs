@@ -1,14 +1,10 @@
 mod poll;
 use poll::check_urls;
 
-mod about;
-use about::handle_about;
+mod handler;
+use handler::{handle_about, handle_list, handle_track};
 
 mod alert;
-
-mod list;
-use list::handle_list;
-
 mod data;
 mod http;
 mod schema;
@@ -64,12 +60,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             Command::descriptions().to_string(),
         ).await?;
         }
-        Command::Track(website) => {
-            bot.send_message(
-                msg.chat.id,
-                format!("{website}"),
-            ).await?;
-        }
+        Command::Track(website) => handle_track(bot, msg, website).await?,
         Command::Untrack(website) => {
             bot.send_message(
                 msg.chat.id,
