@@ -3,5 +3,8 @@
 .env.local
 db
 .git
-main
 *.csv
+target
+.vscode
+.github
+Dockerfile

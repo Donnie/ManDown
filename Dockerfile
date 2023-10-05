@@ -1,43 +1,46 @@
-FROM golang:alpine AS builder
-RUN apk update && apk add --no-cache git ca-certificates && update-ca-certificates
-RUN apk add --virtual build-dependencies build-base gcc
+FROM rust:alpine as builder
+RUN apk update && apk add --no-cache pkgconfig musl-dev libressl-dev
 
 # Set necessary environmet variables needed for our image
-ENV GO111MODULE=on \
-    CGO_ENABLED=1 \
-    GOOS=linux \
-    GOARCH=amd64
+ENV RUSTFLAGS='-C target-feature=-crt-static'
 
 # Move to working directory /build
 WORKDIR /build
 
-# Copy and download dependency using go mod
-COPY go.mod .
-COPY go.sum .
-RUN go mod download
+# Create an unprivileged user
+ENV USER=appuser
+ENV UID=10001
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/nonexistent" \
+    --shell "/sbin/nologin" \
+    --no-create-home \
+    --uid "${UID}" \
+    "${USER}"
 
 # Copy the code into the container
-COPY . .
-
-# Run test
-RUN go test ./...
+COPY src/ src/
+COPY Cargo.* ./
 
 # Build the application
-RUN go build -ldflags '-extldflags "-static"' -o main
-
-# Move to /dist directory as the place for resulting binary folder
-WORKDIR /dist
-
-# Copy binary from build to main folder
-RUN cp /build/main .
+RUN cargo build --release
 
 ############################
 # STEP 2 build a small image
 ############################
-FROM scratch
+FROM alpine
 
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /dist/main /
+RUN apk update && apk add --no-cache libgcc libressl
+
+COPY --from=builder /build/target/release/man_down /mandown
+
+# Import the user and group files from the builder
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
+
+# Use the unprivileged user
+USER appuser:appuser
 
 # Command to run the executable
-ENTRYPOINT ["/main"]
+ENTRYPOINT [ "/mandown" ]

@@ -4,3 +4,6 @@ db
 main
 *.csv
 .goreload
+/target
+.vscode
+.DS_Store
