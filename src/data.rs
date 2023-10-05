@@ -1,8 +1,10 @@
-use crate::schema::{Website, User};
-use diesel::{prelude::*, sqlite::SqliteConnection, dsl::*};
+use crate::schema::{User, Website};
+use diesel::{dsl::*, prelude::*, sqlite::SqliteConnection};
 use url::Url;
 
-pub fn get_all_websites(conn: &mut SqliteConnection) -> Result<Vec<Website>, diesel::result::Error> {
+pub fn get_all_websites(
+    conn: &mut SqliteConnection,
+) -> Result<Vec<Website>, diesel::result::Error> {
     use crate::schema::websites::dsl::*;
     // Fetch all the Websites from the websites table
     let webs: Vec<Website> = websites.load(conn)?;
@@ -10,10 +12,13 @@ pub fn get_all_websites(conn: &mut SqliteConnection) -> Result<Vec<Website>, die
     Ok(webs)
 }
 
-pub async fn list_websites_by_user(conn: &mut SqliteConnection, telegram_id: i32) -> Result<Vec<Website>, diesel::result::Error> {
-    use crate::schema::users::dsl::{users, id as uid, telegram_id as tele_id};
+pub async fn list_websites_by_user(
+    conn: &mut SqliteConnection,
+    telegram_id: i32,
+) -> Result<Vec<Website>, diesel::result::Error> {
     use crate::schema::user_websites::dsl::*;
-    use crate::schema::websites::dsl::{websites, id as wid, last_checked_time, status, url};
+    use crate::schema::users::dsl::{id as uid, telegram_id as tele_id, users};
+    use crate::schema::websites::dsl::{id as wid, last_checked_time, status, url, websites};
 
     let webs: Vec<Website> = users
         .inner_join(user_websites.on(user_id.eq(uid)))
@@ -25,9 +30,49 @@ pub async fn list_websites_by_user(conn: &mut SqliteConnection, telegram_id: i32
     Ok(webs)
 }
 
-pub async fn list_users_by_website(conn: &mut SqliteConnection, website_id: i32) -> Result<Vec<User>, diesel::result::Error> {
-    use crate::schema::users::dsl::{users, id as uid, name, plan_type, telegram_id as tele_id};
-    use crate::schema::user_websites::dsl::{user_websites, website_id as wid, user_id};
+pub async fn get_user_by_telegram_id(
+    conn: &mut SqliteConnection,
+    tele_id: i32,
+) -> Result<User, diesel::result::Error> {
+    use crate::schema::users::dsl::*;
+    users.filter(telegram_id.eq(tele_id)).first(conn)
+}
+
+pub async fn get_websites_by_url(
+    conn: &mut SqliteConnection,
+    wurl: &str,
+) -> Result<Vec<Website>, diesel::result::Error> {
+    use crate::schema::websites::dsl::*;
+    websites
+        .filter(url.like(format!("htt%://{}", wurl)))
+        .load(conn)
+}
+
+pub async fn delete_user_website(
+    conn: &mut SqliteConnection,
+    w_id: i32,
+    u_id: i32,
+) -> QueryResult<usize> {
+    use crate::schema::user_websites::dsl::*;
+    diesel::delete(user_websites.filter(user_id.eq(u_id).and(website_id.eq(w_id)))).execute(conn)
+}
+
+pub async fn delete_website(conn: &mut SqliteConnection, w_id: i32) -> QueryResult<usize> {
+    use crate::schema::websites::dsl::*;
+    diesel::delete(websites.filter(id.eq(w_id))).execute(conn)
+}
+
+pub async fn delete_user(conn: &mut SqliteConnection, u_id: i32) -> QueryResult<usize> {
+    use crate::schema::users::dsl::*;
+    diesel::delete(users.filter(id.eq(u_id))).execute(conn)
+}
+
+pub async fn list_users_by_website(
+    conn: &mut SqliteConnection,
+    website_id: i32,
+) -> Result<Vec<User>, diesel::result::Error> {
+    use crate::schema::user_websites::dsl::{user_id, user_websites, website_id as wid};
+    use crate::schema::users::dsl::{id as uid, name, plan_type, telegram_id as tele_id, users};
 
     let uss: Vec<User> = user_websites
         .filter(wid.eq(website_id))
@@ -38,7 +83,10 @@ pub async fn list_users_by_website(conn: &mut SqliteConnection, website_id: i32)
     Ok(uss)
 }
 
-pub fn compare_websites(conn: &mut SqliteConnection, webs: Vec<Website>) -> Result<Vec<Website>, diesel::result::Error> {
+pub fn compare_websites(
+    conn: &mut SqliteConnection,
+    webs: Vec<Website>,
+) -> Result<Vec<Website>, diesel::result::Error> {
     let current_websites: Vec<Website> = get_all_websites(conn)?;
 
     let mut changed_websites: Vec<Website> = Vec::new();
@@ -55,7 +103,10 @@ pub fn compare_websites(conn: &mut SqliteConnection, webs: Vec<Website>) -> Resu
     Ok(changed_websites)
 }
 
-pub fn write_all_websites(conn: &mut SqliteConnection, webs: Vec<Website>) -> Result<Vec<Website>, diesel::result::Error> {
+pub fn write_all_websites(
+    conn: &mut SqliteConnection,
+    webs: Vec<Website>,
+) -> Result<Vec<Website>, diesel::result::Error> {
     let ids: Vec<i32> = webs.iter().map(|web| web.id).collect();
 
     // Building the SQL update statement
@@ -72,7 +123,11 @@ pub fn write_all_websites(conn: &mut SqliteConnection, webs: Vec<Website>) -> Re
         sql += &format!(" WHEN {} THEN {}", web.id, web.status);
     }
     sql += " END WHERE id IN (";
-    sql += &ids.iter().map(|id| id.to_string()).collect::<Vec<String>>().join(",");
+    sql += &ids
+        .iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<String>>()
+        .join(",");
     sql += ")";
 
     // Executing the SQL update statement
@@ -82,7 +137,9 @@ pub fn write_all_websites(conn: &mut SqliteConnection, webs: Vec<Website>) -> Re
 }
 
 fn try_parse_url(input: &str) -> Option<Url> {
-    Url::parse(input).or_else(|_| Url::parse(&format!("http://{}", input))).ok()
+    Url::parse(input)
+        .or_else(|_| Url::parse(&format!("http://{}", input)))
+        .ok()
 }
 
 pub fn extract_hostname(input: &str) -> String {
@@ -101,7 +158,7 @@ pub fn extract_hostname(input: &str) -> String {
 pub fn read_url(input: &str) -> (bool, String, String) {
     let url = extract_hostname(input);
     if url == "" {
-        return (false, "".to_string(), "".to_string())
+        return (false, "".to_string(), "".to_string());
     }
-    return (true, format!("http://{}", url), format!("https://{}", url))
+    return (true, format!("http://{}", url), format!("https://{}", url));
 }

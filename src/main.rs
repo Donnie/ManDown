@@ -2,7 +2,7 @@ mod poll;
 use poll::check_urls;
 
 mod handler;
-use handler::{handle_about, handle_list, handle_track};
+use handler::{handle_about, handle_list, handle_track, handle_untrack};
 
 mod alert;
 mod data;
@@ -55,10 +55,8 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
                 .await?;
         }
-        Command::Track(website) => handle_track(bot, msg, website).await?,
-        Command::Untrack(website) => {
-            bot.send_message(msg.chat.id, format!("{website}")).await?;
-        }
+        Command::Track(website) => handle_track(bot, msg, website.to_lowercase()).await?,
+        Command::Untrack(website) => handle_untrack(bot, msg, website.to_lowercase()).await?,
     };
     Ok(())
 }

@@ -74,10 +74,12 @@ pub async fn put_user_website(
 ) -> QueryResult<usize> {
     use crate::schema::user_websites::dsl::*;
 
-    let curr_user_id = put_user(conn, user_telegram_id).await.expect("msg");
-    let curr_website_id = put_website(conn, website_url).await.expect("msg");
-
-    println!("{} {}", curr_user_id, curr_website_id);
+    let curr_user_id = put_user(conn, user_telegram_id)
+        .await
+        .expect("User ID not found");
+    let curr_website_id = put_website(conn, website_url)
+        .await
+        .expect("Website ID not found");
 
     // Check if the relationship already exists
     match user_websites

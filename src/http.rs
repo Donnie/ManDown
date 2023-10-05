@@ -1,21 +1,18 @@
 use crate::schema::Website;
-use std::time::SystemTime;
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
+use std::time::SystemTime;
 
 // Function to update HTTP status of each website
 pub async fn update_http_status(webs: &mut Vec<Website>) {
     // Check internet connection
     let result = has_internet_connection().await;
     if !result {
-        println!("No internet connection");
-        return
+        return;
     }
 
     // Create a vector to store all the futures
-    let futures: Vec<_> = webs.iter_mut()
-      .map(|web| update_web_status(web))
-      .collect();
+    let futures: Vec<_> = webs.iter_mut().map(|web| update_web_status(web)).collect();
 
     // Wait for all futures to complete
     join_all(futures).await;
@@ -44,17 +41,18 @@ async fn has_internet_connection() -> bool {
         "https://www.apple.com",
         "https://www.amazon.com",
         "https://www.netflix.com",
-        "https://www.google.com"
+        "https://www.google.com",
     ];
 
     let client = reqwest::Client::new();
 
-    let tasks: Vec<_> = websites.iter().map(|&site| {
-        let client = client.clone();
-        tokio::spawn(async move {
-            client.get(site).send().await.is_ok()
+    let tasks: Vec<_> = websites
+        .iter()
+        .map(|&site| {
+            let client = client.clone();
+            tokio::spawn(async move { client.get(site).send().await.is_ok() })
         })
-    }).collect();
+        .collect();
 
     let results: Vec<_> = join_all(tasks).await;
 

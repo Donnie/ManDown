@@ -1,5 +1,8 @@
 use crate::alert::process;
-use crate::data::read_url;
+use crate::data::{
+    delete_user, delete_user_website, delete_website, extract_hostname, get_user_by_telegram_id,
+    get_websites_by_url, list_users_by_website, read_url,
+};
 use crate::http::get_status;
 use crate::insert::put_user_website;
 use crate::{data::list_websites_by_user, establish_connection};
@@ -73,6 +76,63 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
             .await
             .expect(&format!("Error inserting site {}", &ssl));
     }
+
+    Ok(())
+}
+
+pub async fn handle_untrack(bot: Bot, msg: Message, website: String) -> ResponseResult<()> {
+    let mut conn = establish_connection();
+    let telegram_id = msg.from().unwrap().id.0 as i32;
+    let website = extract_hostname(&website);
+
+    // get owner by telegram_id
+    let user = get_user_by_telegram_id(&mut conn, telegram_id)
+        .await
+        .expect("Error getting user");
+
+    // get sites matching url
+    let sites = get_websites_by_url(&mut conn, &website)
+        .await
+        .expect("Error getting website");
+
+    for site in sites {
+        delete_user_website(&mut conn, site.id, user.id)
+            .await
+            .expect("Error deleting user website");
+
+        // get list of owners from url
+        let owners = list_users_by_website(&mut conn, site.id)
+            .await
+            .expect("Error listing owners");
+
+        // if no owners then delete the website from the database
+        let owners_count = owners.len();
+        if owners_count == 0 {
+            delete_website(&mut conn, site.id)
+                .await
+                .expect("Error deleting website");
+        }
+    }
+
+    // get list of websites from telegram_id
+    let sites = list_websites_by_user(&mut conn, telegram_id)
+        .await
+        .expect("Error listing websites");
+
+    // if no sites then delete the owner from the database
+    let sites_count = sites.len();
+    if sites_count == 0 {
+        delete_user(&mut conn, user.id)
+            .await
+            .expect("Error deleting user");
+    }
+
+    bot.send_message(
+        msg.chat.id,
+        format!("Website {} untracked successfully!", website),
+    )
+    .parse_mode(ParseMode::Html)
+    .await?;
 
     Ok(())
 }
