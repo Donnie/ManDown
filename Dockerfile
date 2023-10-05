@@ -38,6 +38,7 @@ COPY --from=builder /build/target/release/man_down /mandown
 # Import the user and group files from the builder
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
+COPY migrations /migrations
 
 # Use the unprivileged user
 USER appuser:appuser
