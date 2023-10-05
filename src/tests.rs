@@ -1,9 +1,6 @@
-use crate::data::extract_hostname;
-
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::data::extract_hostname;
 
     #[test]
     fn test_empty_string() {
