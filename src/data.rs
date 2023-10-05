@@ -72,12 +72,12 @@ pub async fn list_users_by_website(
     website_id: i32,
 ) -> Result<Vec<User>, diesel::result::Error> {
     use crate::schema::user_websites::dsl::{user_id, user_websites, website_id as wid};
-    use crate::schema::users::dsl::{id as uid, name, plan_type, telegram_id as tele_id, users};
+    use crate::schema::users::dsl::{id as uid, name, user_type, telegram_id as tele_id, users};
 
     let uss: Vec<User> = user_websites
         .filter(wid.eq(website_id))
         .inner_join(users.on(user_id.eq(uid)))
-        .select((uid, name, plan_type, tele_id))
+        .select((uid, name, user_type, tele_id))
         .load(conn)?;
 
     Ok(uss)

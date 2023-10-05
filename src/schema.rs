@@ -13,7 +13,7 @@ diesel::table! {
     users (id) {
         id -> Integer,
         name -> Nullable<Text>,
-        plan_type -> Nullable<Text>,
+        user_type -> Nullable<Text>,
         telegram_id -> Integer,
     }
 }
@@ -40,7 +40,7 @@ diesel::allow_tables_to_appear_in_same_query!(
 pub struct User {
     pub id: i32,
     pub name: Option<String>,
-    pub plan_type: Option<String>,
+    pub user_type: Option<String>,
     pub telegram_id: i32,
 }
 
