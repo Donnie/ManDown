@@ -2,6 +2,7 @@ use crate::alert::notify_user;
 use crate::data::{compare_websites, get_all_websites, write_all_websites};
 use crate::http::update_http_status;
 use diesel::sqlite::SqliteConnection;
+use log::info;
 use teloxide::Bot;
 use tokio::time;
 
@@ -14,6 +15,8 @@ pub async fn check_urls(conn: &mut SqliteConnection, interval: u64, bot: Bot) {
 
 // Function to process DB
 async fn check_websites(conn: &mut SqliteConnection, bot: Bot) {
+    info!("Checking Websites now");
+
     // Read from DB
     let mut webs = get_all_websites(conn).expect("Error listing Websites");
 
@@ -22,6 +25,8 @@ async fn check_websites(conn: &mut SqliteConnection, bot: Bot) {
 
     let changed_webs = compare_websites(conn, webs).expect("Error comparing Websites");
     let web_count: usize = changed_webs.len();
+
+    info!("{} websites changed", web_count);
 
     if web_count.clone() == 0 {
         return;
