@@ -1,4 +1,5 @@
 use diesel::SqliteConnection;
+use log::info;
 use teloxide::{prelude::*, types::ParseMode};
 
 use crate::{data::list_users_by_website, schema::Website};
@@ -16,10 +17,13 @@ pub async fn notify_user(conn: &mut SqliteConnection, bot: Bot, changed_webs: Ve
 
             let message = process(&website.url, website.status);
 
-            bot.send_message(chat_id, message)
+            if let Err(e) = bot
+                .send_message(chat_id, message)
                 .parse_mode(ParseMode::Html)
                 .await
-                .unwrap_or_else(|_| panic!("Error sending messages to {}", chat_id));
+            {
+                info!("Failed to send message to {}: {}", chat_id, e);
+            }
         }
     }
 }
