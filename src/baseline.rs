@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::http::HttpClient;
-use futures::future::join_all;
+use futures::{stream::FuturesUnordered, StreamExt};
 
 pub async fn baseline_available() -> bool {
     let config = Config::load().expect("Failed to load config");
@@ -8,17 +8,33 @@ pub async fn baseline_available() -> bool {
 }
 
 pub async fn check_websites<T: HttpClient + 'static>(websites: &[String], client: T) -> bool {
-    let tasks: Vec<_> = websites
+    // Early return for empty list
+    if websites.is_empty() {
+        return false;
+    }
+
+    // For single website, direct await is most efficient
+    if websites.len() == 1 {
+        return client.check_url(&websites[0]).await;
+    }
+
+    // Use FuturesUnordered for efficient concurrent execution with early termination
+    let mut futures = websites
         .iter()
         .map(|site| {
             let client = client.clone();
-            let site = site.clone();
-            tokio::spawn(async move { client.check_url(&site).await })
+            async move { client.check_url(site).await }
         })
-        .collect();
+        .collect::<FuturesUnordered<_>>();
 
-    let results: Vec<_> = join_all(tasks).await;
-    results.into_iter().any(|res| res.unwrap_or(false))
+    // Return true as soon as any future resolves to true
+    while let Some(result) = futures.next().await {
+        if result {
+            return true;
+        }
+    }
+
+    false
 }
 
 #[cfg(test)]
