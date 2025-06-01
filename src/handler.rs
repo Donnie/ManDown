@@ -56,22 +56,31 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
         return Ok(());
     }
 
-    let normal_status = get_status(&normal).await?;
-    let message = process(&normal, normal_status as i32);
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .unwrap();
+
+    let status = (get_status(&normal, &client).await).unwrap_or_default();
+    let message = process(&normal, status as i32);
+
     bot.send_message(msg.chat.id, message)
         .parse_mode(ParseMode::Html)
         .await?;
-    if normal_status == 200 {
+
+    if status == 200 {
         put_user_website(&mut conn, &normal, telegram_id)
             .await
             .unwrap_or_else(|_| panic!("Error inserting site {}", &normal));
     }
 
-    let ssl_status = get_status(&ssl).await?;
+    let ssl_status = (get_status(&ssl, &client).await).unwrap_or_default();
+
     let message = process(&ssl, ssl_status as i32);
     bot.send_message(msg.chat.id, message)
         .parse_mode(ParseMode::Html)
         .await?;
+
     if ssl_status == 200 {
         put_user_website(&mut conn, &ssl, telegram_id)
             .await
