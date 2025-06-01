@@ -1,4 +1,4 @@
-use crate::schema::Website;
+use crate::{baseline::baseline_available, schema::Website};
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use std::time::SystemTime;
@@ -20,8 +20,8 @@ impl HttpClient for reqwest::Client {
 
 // Function to update HTTP status of each website
 pub async fn update_http_status(webs: &mut Vec<Website>) {
-    // Check internet connection
-    let result = has_internet_connection().await;
+    // Check baseline availability
+    let result = baseline_available().await;
     if !result {
         return;
     }
@@ -48,28 +48,4 @@ pub async fn get_status(url: &str) -> Result<u16, reqwest::Error> {
     let res = client.get(url).send().await?;
 
     Ok(res.status().as_u16())
-}
-
-async fn has_internet_connection() -> bool {
-    let websites = [
-        "https://www.facebook.com",
-        "https://www.apple.com",
-        "https://www.amazon.com",
-        "https://www.netflix.com",
-        "https://www.google.com",
-    ];
-
-    let client = reqwest::Client::new();
-
-    let tasks: Vec<_> = websites
-        .iter()
-        .map(|&site| {
-            let client = client.clone();
-            tokio::spawn(async move { client.get(site).send().await.is_ok() })
-        })
-        .collect();
-
-    let results: Vec<_> = join_all(tasks).await;
-
-    results.into_iter().any(|res| res.unwrap_or(false))
 }
