@@ -7,7 +7,6 @@ use crate::http::get_status;
 use crate::insert::put_user_website;
 use crate::parse_url::{extract_hostname, read_url};
 use crate::{data::list_websites_by_user, establish_connection};
-use log::info;
 use teloxide::{prelude::*, types::ParseMode};
 
 pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
@@ -57,29 +56,38 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
         return Ok(());
     }
 
-    let normal_status = get_status(&normal, &reqwest::Client::new()).await?;
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .unwrap();
 
-    info!(
-        "telegram_id: {} tried to track: {} and got status: {}",
-        telegram_id, website, normal_status
-    );
+    let status = match get_status(&normal, &client).await {
+        Ok(code) => code,
+        Err(_e) => 0,
+    };
 
-    let message = process(&normal, normal_status as i32);
+    let message = process(&normal, status as i32);
 
     bot.send_message(msg.chat.id, message)
         .parse_mode(ParseMode::Html)
         .await?;
-    if normal_status == 200 {
+
+    if status == 200 {
         put_user_website(&mut conn, &normal, telegram_id)
             .await
             .unwrap_or_else(|_| panic!("Error inserting site {}", &normal));
     }
 
-    let ssl_status = get_status(&ssl, &reqwest::Client::new()).await?;
+    let ssl_status = match get_status(&ssl, &client).await {
+        Ok(code) => code,
+        Err(_e) => 0,
+    };
+
     let message = process(&ssl, ssl_status as i32);
     bot.send_message(msg.chat.id, message)
         .parse_mode(ParseMode::Html)
         .await?;
+
     if ssl_status == 200 {
         put_user_website(&mut conn, &ssl, telegram_id)
             .await

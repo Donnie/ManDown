@@ -63,6 +63,8 @@ pub async fn get_status<C: HttpClient>(url: &str, client: &C) -> Result<u16, req
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     // Mock HTTP client for testing
     #[derive(Clone)]
