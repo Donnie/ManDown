@@ -14,7 +14,7 @@ mod parse_url;
 mod schema;
 
 use diesel::{prelude::*, sqlite::SqliteConnection};
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use dotenvy::dotenv;
 
 use teloxide::{prelude::*, utils::command::BotCommands};

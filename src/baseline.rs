@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::http::HttpClient;
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::{StreamExt, stream::FuturesUnordered};
 
 pub async fn baseline_available() -> bool {
     let config = Config::load().expect("Failed to load config");
@@ -40,8 +40,8 @@ pub async fn check_websites<T: HttpClient + 'static>(websites: &[String], client
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     // Mock HTTP client for testing
     #[derive(Clone)]
