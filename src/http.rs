@@ -2,6 +2,21 @@ use crate::schema::Website;
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use std::time::SystemTime;
+use async_trait;
+
+// Trait for HTTP clients to enable testing
+#[async_trait::async_trait]
+pub trait HttpClient: Clone + Send + Sync {
+    async fn check_url(&self, url: &str) -> bool;
+}
+
+// Implementation for reqwest::Client
+#[async_trait::async_trait]
+impl HttpClient for reqwest::Client {
+    async fn check_url(&self, url: &str) -> bool {
+        self.get(url).send().await.is_ok()
+    }
+}
 
 // Function to update HTTP status of each website
 pub async fn update_http_status(webs: &mut Vec<Website>) {
