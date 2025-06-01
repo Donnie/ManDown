@@ -61,10 +61,6 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
 
-    - name: Run integration tests
-      run: cargo test --test '*' --verbose
-      continue-on-error: true
-
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest

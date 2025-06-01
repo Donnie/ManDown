@@ -22,7 +22,14 @@ RUN adduser \
 # Copy the code into the container
 COPY src/ src/
 COPY migrations/ migrations/
+COPY config.yaml ./
 COPY Cargo.* ./
+
+RUN rustup component add rustfmt clippy
+
+RUN cargo fmt --all -- --check
+
+RUN cargo clippy --all-targets --all-features -- -D warnings
 
 # Run tests
 RUN cargo test
@@ -43,6 +50,7 @@ COPY --from=builder /build/target/release/man_down /mandown
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
 COPY migrations/ migrations/
+COPY config.yaml ./
 
 # Use the unprivileged user
 USER appuser:appuser
