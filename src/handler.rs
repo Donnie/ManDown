@@ -61,11 +61,7 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
         .build()
         .unwrap();
 
-    let status = match get_status(&normal, &client).await {
-        Ok(code) => code,
-        Err(_e) => 0,
-    };
-
+    let status = (get_status(&normal, &client).await).unwrap_or_default();
     let message = process(&normal, status as i32);
 
     bot.send_message(msg.chat.id, message)
@@ -78,10 +74,7 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
             .unwrap_or_else(|_| panic!("Error inserting site {}", &normal));
     }
 
-    let ssl_status = match get_status(&ssl, &client).await {
-        Ok(code) => code,
-        Err(_e) => 0,
-    };
+    let ssl_status = (get_status(&ssl, &client).await).unwrap_or_default();
 
     let message = process(&ssl, ssl_status as i32);
     bot.send_message(msg.chat.id, message)
