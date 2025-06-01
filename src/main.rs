@@ -105,7 +105,10 @@ async fn main() {
 
     // Start the polling function in the background
     let bot_clone = bot.clone();
-    check_urls(pool.clone(), interval, bot_clone).await;
+    let pool_clone = pool.clone();
+    tokio::spawn(async move {
+        check_urls(pool_clone, interval, bot_clone).await;
+    });
 
     // Start the bot's command loop
     let pool = pool.clone();
