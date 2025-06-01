@@ -3,6 +3,14 @@ name: PR Tests
 on:
   pull_request:
     branches: [ main ]
+    paths:
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'src/**'
+      - 'tests/**'
+      - 'migrations/**'
+      - 'diesel.toml'
 
 env:
   CARGO_TERM_COLOR: always
