@@ -37,6 +37,7 @@ diesel::allow_tables_to_appear_in_same_query!(
 );
 
 #[derive(Queryable, Clone)]
+#[allow(dead_code)]
 pub struct User {
     pub id: i32,
     pub name: Option<String>,
@@ -53,6 +54,7 @@ pub struct Website {
 }
 
 #[derive(Queryable, Clone)]
+#[allow(dead_code)]
 pub struct UserWebsite {
     pub user_id: i32,
     pub website_id: i32,

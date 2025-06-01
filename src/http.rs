@@ -2,7 +2,6 @@ use crate::{baseline::baseline_available, schema::Website};
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use std::time::SystemTime;
-use async_trait;
 
 // Trait for HTTP clients to enable testing
 #[async_trait::async_trait]
@@ -19,7 +18,7 @@ impl HttpClient for reqwest::Client {
 }
 
 // Function to update HTTP status of each website
-pub async fn update_http_status(webs: &mut Vec<Website>) {
+pub async fn update_http_status(webs: &mut [Website]) {
     // Check baseline availability
     let result = baseline_available().await;
     if !result {
@@ -27,7 +26,7 @@ pub async fn update_http_status(webs: &mut Vec<Website>) {
     }
 
     // Create a vector to store all the futures
-    let futures: Vec<_> = webs.iter_mut().map(|web| update_web_status(web)).collect();
+    let futures: Vec<_> = webs.iter_mut().map(update_web_status).collect();
 
     // Wait for all futures to complete
     join_all(futures).await;

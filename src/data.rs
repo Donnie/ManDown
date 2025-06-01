@@ -145,7 +145,7 @@ fn try_parse_url(input: &str) -> Option<Url> {
 pub fn extract_hostname(input: &str) -> String {
     let host = try_parse_url(input)
         .and_then(|url| url.host_str().map(|s| s.to_string()))
-        .unwrap_or_else(|| "".to_string());
+        .unwrap_or_default();
 
     // Ensure that the host contains a dot (indicating presence of a TLD)
     if host.contains('.') {
@@ -157,8 +157,8 @@ pub fn extract_hostname(input: &str) -> String {
 
 pub fn read_url(input: &str) -> (bool, String, String) {
     let url = extract_hostname(input);
-    if url == "" {
+    if url.is_empty() {
         return (false, "".to_string(), "".to_string());
     }
-    return (true, format!("http://{}", url), format!("https://{}", url));
+    (true, format!("http://{}", url), format!("https://{}", url))
 }

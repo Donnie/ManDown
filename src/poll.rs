@@ -28,7 +28,7 @@ async fn check_websites(conn: &mut SqliteConnection, bot: Bot) {
 
     info!("{} websites changed", web_count);
 
-    if web_count.clone() == 0 {
+    if web_count == 0 {
         return;
     }
 

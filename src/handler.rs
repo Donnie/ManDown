@@ -49,7 +49,7 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
 
     let (valid, normal, ssl) = read_url(&website);
     if !valid {
-        bot.send_message(msg.chat.id, format!("Invalid URL!"))
+        bot.send_message(msg.chat.id, "Invalid URL!".to_string())
             .parse_mode(ParseMode::Html)
             .await?;
         return Ok(());
@@ -63,7 +63,7 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
     if normal_status == 200 {
         put_user_website(&mut conn, &normal, telegram_id)
             .await
-            .expect(&format!("Error inserting site {}", &normal));
+            .unwrap_or_else(|_| panic!("Error inserting site {}", &normal));
     }
 
     let ssl_status = get_status(&ssl).await?;
@@ -74,7 +74,7 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
     if ssl_status == 200 {
         put_user_website(&mut conn, &ssl, telegram_id)
             .await
-            .expect(&format!("Error inserting site {}", &ssl));
+            .unwrap_or_else(|_| panic!("Error inserting site {}", &ssl));
     }
 
     Ok(())
