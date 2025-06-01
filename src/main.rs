@@ -5,6 +5,7 @@ mod handler;
 use handler::{handle_about, handle_list, handle_track, handle_untrack};
 
 mod alert;
+mod config;
 mod data;
 mod http;
 mod insert;
