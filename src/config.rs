@@ -1,6 +1,6 @@
 use serde::Deserialize;
-use std::fs;
 use std::env;
+use std::fs;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -18,4 +18,4 @@ impl Config {
         let config: Config = serde_yaml::from_str(&contents)?;
         Ok(config)
     }
-} 
+}
