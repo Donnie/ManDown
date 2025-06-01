@@ -17,5 +17,5 @@ rusqlite = "0.29"
 serde = "1.0.130"
 serde_derive = "1.0.130"
 teloxide = { version = "0.12", features = ["auto-send", "macros"] }
-tokio = { version = "1.8.3", features = ["full"] }
+tokio = { version = "1.38.2", features = ["full"] }
 url = "2.2"
