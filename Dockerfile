@@ -1,5 +1,5 @@
 FROM rust:alpine as builder
-RUN apk update && apk add --no-cache pkgconfig musl-dev libressl-dev sqlite-dev
+RUN apk update && apk add --no-cache pkgconfig musl-dev openssl-dev sqlite-dev
 
 # Set necessary environmet variables needed for our image
 ENV RUSTFLAGS='-C target-feature=-crt-static'
@@ -42,7 +42,7 @@ RUN cargo build --release
 ############################
 FROM alpine
 
-RUN apk update && apk add --no-cache libgcc libressl sqlite sqlite-libs
+RUN apk update && apk add --no-cache libgcc openssl sqlite sqlite-libs
 
 COPY --from=builder /build/target/release/man_down /mandown
 
