@@ -1,11 +1,11 @@
 use crate::alert::process;
 use crate::data::{
-    delete_user, delete_user_website, delete_website, get_user_by_telegram_id,
-    get_websites_by_url, list_users_by_website,
+    delete_user, delete_user_website, delete_website, get_user_by_telegram_id, get_websites_by_url,
+    list_users_by_website,
 };
-use crate::parse_url::{extract_hostname, read_url};
 use crate::http::get_status;
 use crate::insert::put_user_website;
+use crate::parse_url::{extract_hostname, read_url};
 use crate::{data::list_websites_by_user, establish_connection};
 use teloxide::{prelude::*, types::ParseMode};
 
