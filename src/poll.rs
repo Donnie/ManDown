@@ -1,14 +1,25 @@
 use crate::alert::notify_user;
 use crate::data::{compare_websites, get_all_websites, write_all_websites};
 use crate::http::update_http_status;
+use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
 use log::info;
 use teloxide::Bot;
 use tokio::time;
 
-pub async fn check_urls(conn: &mut SqliteConnection, interval: u64, bot: Bot) {
+pub async fn check_urls(
+    pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
+    interval: u64,
+    bot: Bot,
+) {
     loop {
-        check_websites(conn, bot.clone()).await;
+        let pool = pool.clone();
+        let bot = bot.clone();
+        tokio::spawn(async move {
+            let mut conn = pool.get().unwrap();
+            check_websites(&mut conn, bot).await;
+        });
+
         tokio::time::sleep(time::Duration::from_secs(interval)).await;
     }
 }

@@ -13,7 +13,8 @@ mod insert;
 mod parse_url;
 mod schema;
 
-use diesel::{prelude::*, sqlite::SqliteConnection};
+use diesel::r2d2::{self, ConnectionManager};
+use diesel::sqlite::SqliteConnection;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use dotenvy::dotenv;
 
@@ -41,7 +42,12 @@ enum Command {
     Untrack(String),
 }
 
-async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
+async fn answer(
+    bot: Bot,
+    msg: Message,
+    cmd: Command,
+    pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
+) -> ResponseResult<()> {
     match cmd {
         Command::About => handle_about(bot, msg).await?,
         Command::Clear => {
@@ -52,24 +58,25 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
                 .await?;
         }
-        Command::List => handle_list(bot, msg).await?,
+        Command::List => handle_list(bot, msg, pool).await?,
         Command::Start => {
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
                 .await?;
         }
-        Command::Track(website) => handle_track(bot, msg, website.to_lowercase()).await?,
-        Command::Untrack(website) => handle_untrack(bot, msg, website.to_lowercase()).await?,
+        Command::Track(website) => handle_track(bot, msg, website.to_lowercase(), pool).await?,
+        Command::Untrack(website) => handle_untrack(bot, msg, website.to_lowercase(), pool).await?,
     };
     Ok(())
 }
 
-pub fn establish_connection() -> SqliteConnection {
+pub fn establish_connection() -> r2d2::Pool<ConnectionManager<SqliteConnection>> {
     dotenv().ok();
 
     let database_url = dotenvy::var("DATABASE_URL").expect("DATABASE_URL must be set");
-
-    SqliteConnection::establish(&database_url)
-        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
+    let manager = ConnectionManager::<SqliteConnection>::new(database_url);
+    r2d2::Pool::builder()
+        .build(manager)
+        .expect("Failed to create pool")
 }
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
@@ -80,8 +87,10 @@ async fn main() {
     // Load environment variables from a `.env` file if it exists
     dotenv().ok();
 
-    let mut conn = establish_connection();
+    let pool = establish_connection();
 
+    // Run migrations using a connection from the pool
+    let mut conn = pool.get().expect("Failed to get connection from pool");
     conn.run_pending_migrations(MIGRATIONS)
         .expect("Failed to apply database migrations");
 
@@ -96,10 +105,13 @@ async fn main() {
 
     // Start the polling function in the background
     let bot_clone = bot.clone();
-    tokio::spawn(async move {
-        check_urls(&mut conn, interval, bot_clone).await;
-    });
+    check_urls(pool.clone(), interval, bot_clone).await;
 
     // Start the bot's command loop
-    Command::repl(bot, answer).await;
+    let pool = pool.clone();
+    Command::repl(bot, move |bot, msg, cmd| {
+        let pool = pool.clone();
+        async move { answer(bot, msg, cmd, pool).await }
+    })
+    .await;
 }

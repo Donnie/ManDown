@@ -1,4 +1,5 @@
 use crate::alert::process;
+use crate::data::list_websites_by_user;
 use crate::data::{
     delete_user, delete_user_website, delete_website, get_user_by_telegram_id, get_websites_by_url,
     list_users_by_website,
@@ -6,7 +7,8 @@ use crate::data::{
 use crate::http::get_status;
 use crate::insert::put_user_website;
 use crate::parse_url::{extract_hostname, read_url};
-use crate::{data::list_websites_by_user, establish_connection};
+use diesel::r2d2::{self, ConnectionManager};
+use diesel::sqlite::SqliteConnection;
 use teloxide::{prelude::*, types::ParseMode};
 
 pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
@@ -22,8 +24,12 @@ pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
     Ok(())
 }
 
-pub async fn handle_list(bot: Bot, msg: Message) -> ResponseResult<()> {
-    let mut conn = establish_connection();
+pub async fn handle_list(
+    bot: Bot,
+    msg: Message,
+    pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
+) -> ResponseResult<()> {
+    let mut conn = pool.get().expect("Failed to get connection from pool");
     let telegram_id = msg.from().unwrap().id.0 as i32;
     let webs = list_websites_by_user(&mut conn, telegram_id)
         .await
@@ -44,8 +50,13 @@ pub async fn handle_list(bot: Bot, msg: Message) -> ResponseResult<()> {
     Ok(())
 }
 
-pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseResult<()> {
-    let mut conn = establish_connection();
+pub async fn handle_track(
+    bot: Bot,
+    msg: Message,
+    website: String,
+    pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
+) -> ResponseResult<()> {
+    let mut conn = pool.get().expect("Failed to get connection from pool");
     let telegram_id = msg.from().unwrap().id.0 as i32;
 
     let (valid, normal, ssl) = read_url(&website);
@@ -90,8 +101,13 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
     Ok(())
 }
 
-pub async fn handle_untrack(bot: Bot, msg: Message, website: String) -> ResponseResult<()> {
-    let mut conn = establish_connection();
+pub async fn handle_untrack(
+    bot: Bot,
+    msg: Message,
+    website: String,
+    pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
+) -> ResponseResult<()> {
+    let mut conn = pool.get().expect("Failed to get connection from pool");
     let telegram_id = msg.from().unwrap().id.0 as i32;
     let website = extract_hostname(&website);
 
