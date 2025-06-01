@@ -7,6 +7,7 @@ use crate::http::get_status;
 use crate::insert::put_user_website;
 use crate::parse_url::{extract_hostname, read_url};
 use crate::{data::list_websites_by_user, establish_connection};
+use log::info;
 use teloxide::{prelude::*, types::ParseMode};
 
 pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
@@ -56,8 +57,15 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
         return Ok(());
     }
 
-    let normal_status = get_status(&normal).await?;
+    let normal_status = get_status(&normal, &reqwest::Client::new()).await?;
+
+    info!(
+        "telegram_id: {} tried to track: {} and got status: {}",
+        telegram_id, website, normal_status
+    );
+
     let message = process(&normal, normal_status as i32);
+
     bot.send_message(msg.chat.id, message)
         .parse_mode(ParseMode::Html)
         .await?;
@@ -67,7 +75,7 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
             .unwrap_or_else(|_| panic!("Error inserting site {}", &normal));
     }
 
-    let ssl_status = get_status(&ssl).await?;
+    let ssl_status = get_status(&ssl, &reqwest::Client::new()).await?;
     let message = process(&ssl, ssl_status as i32);
     bot.send_message(msg.chat.id, message)
         .parse_mode(ParseMode::Html)

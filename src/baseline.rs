@@ -54,6 +54,10 @@ mod tests {
         async fn check_url(&self, _url: &str) -> bool {
             self.should_succeed.load(Ordering::SeqCst)
         }
+
+        async fn get_status_code(&self, _url: &str) -> Result<u16, reqwest::Error> {
+            Ok(200)
+        }
     }
 
     #[tokio::test]
