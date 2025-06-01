@@ -1,10 +1,11 @@
 use crate::alert::process;
 use crate::data::{
-    delete_user, delete_user_website, delete_website, extract_hostname, get_user_by_telegram_id,
-    get_websites_by_url, list_users_by_website, read_url,
+    delete_user, delete_user_website, delete_website, get_user_by_telegram_id, get_websites_by_url,
+    list_users_by_website,
 };
 use crate::http::get_status;
 use crate::insert::put_user_website;
+use crate::parse_url::{extract_hostname, read_url};
 use crate::{data::list_websites_by_user, establish_connection};
 use teloxide::{prelude::*, types::ParseMode};
 
@@ -49,7 +50,7 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
 
     let (valid, normal, ssl) = read_url(&website);
     if !valid {
-        bot.send_message(msg.chat.id, format!("Invalid URL!"))
+        bot.send_message(msg.chat.id, "Invalid URL!".to_string())
             .parse_mode(ParseMode::Html)
             .await?;
         return Ok(());
@@ -63,7 +64,7 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
     if normal_status == 200 {
         put_user_website(&mut conn, &normal, telegram_id)
             .await
-            .expect(&format!("Error inserting site {}", &normal));
+            .unwrap_or_else(|_| panic!("Error inserting site {}", &normal));
     }
 
     let ssl_status = get_status(&ssl).await?;
@@ -74,7 +75,7 @@ pub async fn handle_track(bot: Bot, msg: Message, website: String) -> ResponseRe
     if ssl_status == 200 {
         put_user_website(&mut conn, &ssl, telegram_id)
             .await
-            .expect(&format!("Error inserting site {}", &ssl));
+            .unwrap_or_else(|_| panic!("Error inserting site {}", &ssl));
     }
 
     Ok(())

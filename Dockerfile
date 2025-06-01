@@ -24,6 +24,9 @@ COPY src/ src/
 COPY migrations/ migrations/
 COPY Cargo.* ./
 
+# Run tests
+RUN cargo test
+
 # Build the application
 RUN cargo build --release
 

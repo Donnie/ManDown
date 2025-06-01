@@ -1,6 +1,5 @@
 use crate::schema::{User, Website};
 use diesel::{dsl::*, prelude::*, sqlite::SqliteConnection};
-use url::Url;
 
 pub fn get_all_websites(
     conn: &mut SqliteConnection,
@@ -72,7 +71,7 @@ pub async fn list_users_by_website(
     website_id: i32,
 ) -> Result<Vec<User>, diesel::result::Error> {
     use crate::schema::user_websites::dsl::{user_id, user_websites, website_id as wid};
-    use crate::schema::users::dsl::{id as uid, name, user_type, telegram_id as tele_id, users};
+    use crate::schema::users::dsl::{id as uid, name, telegram_id as tele_id, user_type, users};
 
     let uss: Vec<User> = user_websites
         .filter(wid.eq(website_id))
@@ -134,31 +133,4 @@ pub fn write_all_websites(
     sql_query(sql).execute(conn)?;
 
     Ok(webs)
-}
-
-fn try_parse_url(input: &str) -> Option<Url> {
-    Url::parse(input)
-        .or_else(|_| Url::parse(&format!("http://{}", input)))
-        .ok()
-}
-
-pub fn extract_hostname(input: &str) -> String {
-    let host = try_parse_url(input)
-        .and_then(|url| url.host_str().map(|s| s.to_string()))
-        .unwrap_or_else(|| "".to_string());
-
-    // Ensure that the host contains a dot (indicating presence of a TLD)
-    if host.contains('.') {
-        host
-    } else {
-        "".to_string()
-    }
-}
-
-pub fn read_url(input: &str) -> (bool, String, String) {
-    let url = extract_hostname(input);
-    if url == "" {
-        return (false, "".to_string(), "".to_string());
-    }
-    return (true, format!("http://{}", url), format!("https://{}", url));
 }

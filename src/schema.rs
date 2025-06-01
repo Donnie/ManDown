@@ -30,13 +30,10 @@ diesel::table! {
 diesel::joinable!(user_websites -> users (user_id));
 diesel::joinable!(user_websites -> websites (website_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    user_websites,
-    users,
-    websites,
-);
+diesel::allow_tables_to_appear_in_same_query!(user_websites, users, websites,);
 
 #[derive(Queryable, Clone)]
+#[allow(dead_code)]
 pub struct User {
     pub id: i32,
     pub name: Option<String>,
@@ -53,6 +50,7 @@ pub struct Website {
 }
 
 #[derive(Queryable, Clone)]
+#[allow(dead_code)]
 pub struct UserWebsite {
     pub user_id: i32,
     pub website_id: i32,
