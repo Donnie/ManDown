@@ -15,9 +15,9 @@ mod schema;
 
 use diesel::{prelude::*, sqlite::SqliteConnection};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use dotenv::dotenv;
+use dotenvy::dotenv;
 
-use teloxide::{prelude::*, repls::CommandReplExt, utils::command::BotCommands};
+use teloxide::{prelude::*, utils::command::BotCommands};
 
 #[derive(BotCommands, Clone)]
 #[command(
@@ -66,7 +66,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
 pub fn establish_connection() -> SqliteConnection {
     dotenv().ok();
 
-    let database_url = dotenv::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let database_url = dotenvy::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     SqliteConnection::establish(&database_url)
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
@@ -86,7 +86,7 @@ async fn main() {
         .expect("Failed to apply database migrations");
 
     // Get the polling frequency from the environment variable or use a default value
-    let interval: u64 = dotenv::var("FREQ")
+    let interval: u64 = dotenvy::var("FREQ")
         .unwrap_or("600".to_string())
         .parse()
         .expect("FREQ must be a number");
