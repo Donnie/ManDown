@@ -29,9 +29,24 @@ pub fn process(site: &str, code: i32) -> String {
 
     match code {
         0 | 1 => output += "Hoppla! We faced an error trying to reach the site! 🤒",
-        200..=299 => output += &format!("Joohoo! It's live and kicking! 🙂\n\nStatus: <a href='https://httpstatuses.com/{}'>{}</a>", code, code),
-        400..=499 => output += &format!("Erm! Did I do something wrong? 🤔\n\nStatus: <a href='https://httpstatuses.com/{}'>{}</a>", code, code),
-        500..=599 => output += &format!("Schade! It's down or inaccessible to me! 😟\n\nStatus: <a href='https://httpstatuses.com/{}'>{}</a>", code, code),
+        200..=299 => {
+            output += &format!(
+                "Joohoo! It's live and kicking! 🙂\n\nStatus: <a href='https://httpstatuses.com/{}'>{}</a>",
+                code, code
+            )
+        }
+        400..=499 => {
+            output += &format!(
+                "Erm! Did I do something wrong? 🤔\n\nStatus: <a href='https://httpstatuses.com/{}'>{}</a>",
+                code, code
+            )
+        }
+        500..=599 => {
+            output += &format!(
+                "Schade! It's down or inaccessible to me! 😟\n\nStatus: <a href='https://httpstatuses.com/{}'>{}</a>",
+                code, code
+            )
+        }
         _ => output += "Something is fishy! 🐟",
     }
 
