@@ -53,8 +53,8 @@ mod tests {
             self.should_succeed.load(Ordering::SeqCst)
         }
 
-        async fn get_status_code(&self, _url: &str) -> Result<u16, reqwest::Error> {
-            Ok(200)
+        async fn get_status_code(&self, _url: &str) -> u16 {
+            200
         }
     }
 

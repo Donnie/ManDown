@@ -4,12 +4,11 @@ use crate::data::{
     delete_user, delete_user_website, delete_website, get_user_by_telegram_id, get_websites_by_url,
     list_users_by_website,
 };
-use crate::http::HttpClient;
+use crate::http::{cust_client, HttpClient};
 use crate::insert::put_user_website;
 use crate::parse_url::{extract_hostname, read_url};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
-use reqwest::Client;
 use teloxide::{prelude::*, types::ParseMode};
 
 pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
@@ -68,12 +67,9 @@ pub async fn handle_track(
         return Ok(());
     }
 
-    let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .unwrap();
+    let client = cust_client(30);
 
-    let status = client.get_status_code(&normal).await.unwrap_or(0);
+    let status = client.get_status_code(&normal).await;
     let message = process(&normal, status as i32);
 
     bot.send_message(msg.chat.id, message)
@@ -86,7 +82,7 @@ pub async fn handle_track(
             .unwrap_or_else(|_| panic!("Error inserting site {}", &normal));
     }
 
-    let ssl_status = client.get_status_code(&ssl).await.unwrap_or(0);
+    let ssl_status = client.get_status_code(&ssl).await;
 
     let message = process(&ssl, ssl_status as i32);
     bot.send_message(msg.chat.id, message)

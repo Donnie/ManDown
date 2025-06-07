@@ -8,7 +8,7 @@ use std::time::SystemTime;
 #[async_trait::async_trait]
 pub trait HttpClient: Clone + Send + Sync {
     async fn check_url(&self, url: &str) -> bool;
-    async fn get_status_code(&self, url: &str) -> Result<u16, reqwest::Error>;
+    async fn get_status_code(&self, url: &str) -> u16;
 }
 
 // Implementation for reqwest::Client
@@ -19,9 +19,11 @@ impl HttpClient for reqwest::Client {
         res.is_ok()
     }
 
-    async fn get_status_code(&self, url: &str) -> Result<u16, reqwest::Error> {
-        let res = self.get(url).send().await?;
-        Ok(res.status().as_u16())
+    async fn get_status_code(&self, url: &str) -> u16 {
+        match self.get(url).send().await {
+            Ok(res) => res.status().as_u16(),
+            Err(_) => 0
+        }
     }
 }
 
@@ -48,11 +50,7 @@ pub async fn update_http_statuses(webs: &mut [Website], client: &Client) {
 async fn update_http_status(web: &mut Website, client: &Client) {
     let datetime: DateTime<Utc> = SystemTime::now().into();
     web.last_checked_time = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
-
-    match client.get_status_code(&web.url).await {
-        Ok(status) => web.status = status as i32,
-        Err(_e) => web.status = 0,
-    }
+    web.status = client.get_status_code(&web.url).await as i32;
 }
 
 // Function to update HTTP status with retry for failed checks
@@ -85,13 +83,11 @@ mod tests {
             self.should_succeed.load(Ordering::SeqCst)
         }
 
-        async fn get_status_code(&self, _url: &str) -> Result<u16, reqwest::Error> {
+        async fn get_status_code(&self, _url: &str) -> u16 {
             if self.status_code.load(Ordering::SeqCst) {
-                Ok(200)
+                200
             } else {
-                // Simulate a network error by using an invalid URL
-                let client = reqwest::Client::new();
-                client.get_status_code("invalid://url").await
+                0
             }
         }
     }
@@ -104,8 +100,7 @@ mod tests {
         };
 
         let result = client.get_status_code("https://example.com").await;
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 200);
+        assert_eq!(result, 200);
     }
 
     #[tokio::test]
@@ -116,24 +111,21 @@ mod tests {
         };
 
         let result = client.get_status_code("https://example.com").await;
-        assert!(result.is_err());
+        assert_eq!(result, 0);
     }
 
     #[tokio::test]
     async fn test_get_status_real_success() {
         let client = reqwest::Client::new();
         let result = client.get_status_code("https://www.google.com").await;
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 200);
+        assert_eq!(result, 200);
     }
 
     #[tokio::test]
     async fn test_get_status_real_failure() {
         let client = reqwest::Client::new();
-        let result = client
-            .get_status_code("https://this-is-a-fake-website-that-does-not-exist.com")
-            .await;
-        assert!(result.is_err());
+        let result = client.get_status_code("https://this-is-a-fake-website-that-does-not-exist.com").await;
+        assert_eq!(result, 0);
     }
 
     #[tokio::test]
