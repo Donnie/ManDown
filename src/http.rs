@@ -38,7 +38,7 @@ pub async fn update_http_statuses(webs: &mut [Website], client: &Client) {
     // Create a vector to store all the futures
     let futures: Vec<_> = webs
         .iter_mut()
-        .map(|web| update_http_status(web, client))
+        .map(|web| double_check_http_status(web, client))
         .collect();
 
     // Wait for all futures to complete
@@ -52,6 +52,17 @@ async fn update_http_status(web: &mut Website, client: &Client) {
     match client.get_status_code(&web.url).await {
         Ok(status) => web.status = status as i32,
         Err(_e) => web.status = 0,
+    }
+}
+
+// Function to update HTTP status with retry for failed checks
+async fn double_check_http_status(web: &mut Website, client: &Client) {
+    // First attempt
+    update_http_status(web, client).await;
+
+    // If status is 0, retry once
+    if web.status == 0 {
+        update_http_status(web, client).await;
     }
 }
 
