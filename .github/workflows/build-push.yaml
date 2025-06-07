@@ -55,7 +55,7 @@ jobs:
         with:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
-          tags: donnieashok/mandown:${{ env.GITHUB_REF_NAME }}
+          tags: donnieashok/mandown:${{ env.CARGO_TAG }}
           push: true
 
       - name: Move cache
@@ -70,9 +70,9 @@ jobs:
           username: ${{ secrets.GCP_USER }}
           key: ${{ secrets.GCP_SECRET }}
           script: |
-            sudo docker pull donnieashok/mandown:${{ env.GITHUB_REF_NAME }}
+            sudo docker pull donnieashok/mandown:${{ env.CARGO_TAG }}
             sudo docker stop mandown || true
             sudo docker rm mandown || true
             echo "${{ secrets.ENV }}" > ~/mandown/.env
-            sudo docker run -d --restart on-failure -v ~/mandown/db:/db --env-file ~/mandown/.env --name mandown donnieashok/mandown:${{ env.GITHUB_REF_NAME }}
+            sudo docker run -d --restart on-failure -v ~/mandown/db:/db --env-file ~/mandown/.env --name mandown donnieashok/mandown:${{ env.CARGO_TAG }}
             rm ~/mandown/.env
