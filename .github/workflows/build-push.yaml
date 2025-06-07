@@ -25,12 +25,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           echo "Cargo tag: $CARGO_TAG"
-          echo "Tag version: $GITHUB_REF"
+          echo "Tag version: $GITHUB_REF_NAME"
 
-          if [ "$CARGO_TAG" != "$GITHUB_REF" ]; then
+          if [ "$CARGO_TAG" != "$GITHUB_REF_NAME" ]; then
             # Delete the tag
-            gh api -X DELETE /repos/${{ github.repository }}/git/refs/tags/${{ env.GITHUB_REF }}
-            echo "Error: Cargo tag ($CARGO_TAG) does not match tag version ($GITHUB_REF)."
+            gh api -X DELETE /repos/${{ github.repository }}/git/refs/tags/${{ env.GITHUB_REF_NAME }}
+            echo "Error: Cargo tag ($CARGO_TAG) does not match tag version ($GITHUB_REF_NAME)."
             exit 1
           fi
           echo "Version check passed."
@@ -55,7 +55,7 @@ jobs:
         with:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
-          tags: donnieashok/mandown:${{ env.GITHUB_REF }}
+          tags: donnieashok/mandown:${{ env.GITHUB_REF_NAME }}
           push: true
 
       - name: Move cache
@@ -70,9 +70,9 @@ jobs:
           username: ${{ secrets.GCP_USER }}
           key: ${{ secrets.GCP_SECRET }}
           script: |
-            sudo docker pull donnieashok/mandown:${{ env.GITHUB_REF }}
+            sudo docker pull donnieashok/mandown:${{ env.GITHUB_REF_NAME }}
             sudo docker stop mandown || true
             sudo docker rm mandown || true
             echo "${{ secrets.ENV }}" > ~/mandown/.env
-            sudo docker run -d --restart on-failure -v ~/mandown/db:/db --env-file ~/mandown/.env --name mandown donnieashok/mandown:${{ env.GITHUB_REF }}
+            sudo docker run -d --restart on-failure -v ~/mandown/db:/db --env-file ~/mandown/.env --name mandown donnieashok/mandown:${{ env.GITHUB_REF_NAME }}
             rm ~/mandown/.env
