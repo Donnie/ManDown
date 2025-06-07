@@ -4,7 +4,7 @@ use crate::data::{
     delete_user, delete_user_website, delete_website, get_user_by_telegram_id, get_websites_by_url,
     list_users_by_website,
 };
-use crate::http::get_status;
+use crate::http::{HttpClient, cust_client};
 use crate::insert::put_user_website;
 use crate::parse_url::{extract_hostname, read_url};
 use diesel::r2d2::{self, ConnectionManager};
@@ -67,12 +67,9 @@ pub async fn handle_track(
         return Ok(());
     }
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(5))
-        .build()
-        .unwrap();
+    let client = cust_client(30);
 
-    let status = (get_status(&normal, &client).await).unwrap_or_default();
+    let status = client.get_status_code(&normal).await;
     let message = process(&normal, status as i32);
 
     bot.send_message(msg.chat.id, message)
@@ -85,7 +82,7 @@ pub async fn handle_track(
             .unwrap_or_else(|_| panic!("Error inserting site {}", &normal));
     }
 
-    let ssl_status = (get_status(&ssl, &client).await).unwrap_or_default();
+    let ssl_status = client.get_status_code(&ssl).await;
 
     let message = process(&ssl, ssl_status as i32);
     bot.send_message(msg.chat.id, message)

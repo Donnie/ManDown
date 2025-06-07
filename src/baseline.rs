@@ -1,13 +1,14 @@
-use crate::config::Config;
 use crate::http::HttpClient;
+use crate::{config::Config, http::cust_client};
 use futures::{StreamExt, stream::FuturesUnordered};
 
 pub async fn baseline_available() -> bool {
     let config = Config::load().expect("Failed to load config");
-    check_websites(&config.baseline_sites, reqwest::Client::new()).await
+    let client = cust_client(30);
+    check_websites(&config.baseline_sites, &client).await
 }
 
-pub async fn check_websites<T: HttpClient + 'static>(websites: &[String], client: T) -> bool {
+async fn check_websites<T: HttpClient + 'static>(websites: &[String], client: &T) -> bool {
     // Early return for empty list
     if websites.is_empty() {
         return false;
@@ -21,10 +22,7 @@ pub async fn check_websites<T: HttpClient + 'static>(websites: &[String], client
     // Use FuturesUnordered for efficient concurrent execution with early termination
     let mut futures = websites
         .iter()
-        .map(|site| {
-            let client = client.clone();
-            async move { client.check_url(site).await }
-        })
+        .map(|site| async move { client.check_url(site).await })
         .collect::<FuturesUnordered<_>>();
 
     // Return true as soon as any future resolves to true
@@ -55,8 +53,8 @@ mod tests {
             self.should_succeed.load(Ordering::SeqCst)
         }
 
-        async fn get_status_code(&self, _url: &str) -> Result<u16, reqwest::Error> {
-            Ok(200)
+        async fn get_status_code(&self, _url: &str) -> u16 {
+            200
         }
     }
 
@@ -67,7 +65,7 @@ mod tests {
         };
         let websites = vec!["https://test.com".to_string()];
 
-        assert!(check_websites(&websites, client).await);
+        assert!(check_websites(&websites, &client).await);
     }
 
     #[tokio::test]
@@ -77,14 +75,14 @@ mod tests {
         };
         let websites = vec!["https://test.com".to_string()];
 
-        assert!(!check_websites(&websites, client).await);
+        assert!(!check_websites(&websites, &client).await);
     }
 
     #[tokio::test]
     async fn test_check_websites_with_real_config() {
         let config = Config::load().expect("Failed to load config");
-        let client = reqwest::Client::new();
-        let result = check_websites(&config.baseline_sites, client).await;
+        let client = cust_client(5);
+        let result = check_websites(&config.baseline_sites, &client).await;
         println!("Completed without panicking. Available: {}", result);
     }
 
@@ -95,18 +93,18 @@ mod tests {
             "https://another-fake-site-67890.net".to_string(),
             "https://nonexistent-domain-xyz.org".to_string(),
         ];
-        let client = reqwest::Client::new();
+        let client = cust_client(5);
 
-        let result = check_websites(&fake_websites, client).await;
+        let result = check_websites(&fake_websites, &client).await;
         assert!(!result, "Fake websites should not be reachable");
     }
 
     #[tokio::test]
     async fn test_check_websites_empty_list() {
         let empty_websites: Vec<String> = vec![];
-        let client = reqwest::Client::new();
+        let client = cust_client(5);
 
-        let result = check_websites(&empty_websites, client).await;
+        let result = check_websites(&empty_websites, &client).await;
         assert!(!result, "Empty websites list should return false");
     }
 }
