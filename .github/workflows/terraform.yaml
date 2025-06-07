@@ -1,0 +1,206 @@
+name: Terraform Plan and Apply
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'infra/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/**'
+
+env:
+  BUCKET_NAME: ${{ vars.STATE_BUCKET_NAME }}
+  GH_TOKEN: ${{ secrets.SWEM_PAT }}
+
+jobs:
+  terraform-plan:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      id: auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        create_credentials_file: 'true'
+        project_id: ${{ vars.GCP_PROJECT_ID }}
+        workload_identity_provider: ${{ vars.GCP_WIF }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: latest
+        terraform_wrapper: false
+
+    - name: Terraform Format Check
+      working-directory: ./infra
+      run: |
+        echo "🔍 Checking Terraform file formatting..."
+        if ! terraform fmt -check -recursive; then
+          echo ""
+          echo "❌ Terraform formatting issues found!"
+          echo ""
+          echo "The following files need formatting:"
+          terraform fmt -check -recursive -diff
+          echo ""
+          echo "💡 To fix these issues locally, run:"
+          echo "   cd infra && terraform fmt -recursive"
+          echo ""
+          echo "🔧 Or format individual files:"
+          terraform fmt -check -recursive 2>&1 | while read file; do
+            if [[ -n "$file" ]]; then
+              echo "   terraform fmt $file"
+            fi
+          done
+          echo ""
+          exit 1
+        fi
+        echo "✅ All Terraform files are properly formatted!"
+
+    - name: Terraform Init
+      working-directory: ./infra
+      run: |
+        terraform init -backend-config="bucket=$BUCKET_NAME"
+
+    - name: Terraform Validate
+      working-directory: ./infra
+      run: terraform validate
+
+    - name: Terraform Plan
+      id: plan
+      working-directory: ./infra
+      run: |
+        echo "🔍 Running Terraform Plan for Pull Request #${{ github.event.number }}"
+        terraform plan -detailed-exitcode -no-color -out=tfplan 2>&1 | tee plan_output.txt
+        
+        # Set exit code for later use
+        echo "plan_exitcode=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        
+        # Prepare plan output for PR comment
+        echo 'PLAN_OUTPUT<<EOF' >> $GITHUB_ENV
+        cat plan_output.txt >> $GITHUB_ENV
+        echo 'EOF' >> $GITHUB_ENV
+
+    - name: Comment PR with Plan
+      uses: actions/github-script@v7
+      if: github.event_name == 'pull_request'
+      with:
+        script: |
+          const output = `
+          ## 🌍 Terraform Plan Results
+          
+          **Pull Request:** #${{ github.event.number }}
+          **Merge Commit:** ${{ github.sha }}
+          **Plan Exit Code:** ${{ steps.plan.outputs.plan_exitcode }}
+          
+          <details>
+          <summary>📋 Click to expand Terraform Plan</summary>
+          
+          \`\`\`hcl
+          ${{ env.PLAN_OUTPUT }}
+          \`\`\`
+          
+          </details>
+          
+          ---
+          *Plan generated on: ${new Date().toUTCString()}*
+          `;
+          
+          // Find existing comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          
+          const botComment = comments.find(comment => 
+            comment.user.type === 'Bot' && 
+            comment.body.includes('🌍 Terraform Plan Results')
+          );
+          
+          // Update existing comment or create new one
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: output
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: output
+            });
+          }
+
+  terraform-apply:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      id: auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        create_credentials_file: 'true'
+        project_id: ${{ vars.GCP_PROJECT_ID }}
+        workload_identity_provider: ${{ vars.GCP_WIF }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: latest
+        terraform_wrapper: false
+
+    - name: Terraform Init
+      working-directory: ./infra
+      run: |
+        terraform init -backend-config="bucket=$BUCKET_NAME"
+
+    - name: Terraform Plan
+      working-directory: ./infra
+      run: |
+        echo "🔍 Running Terraform Plan on Main Branch"
+        terraform plan -no-color -out=tfplan
+        
+        echo "📋 Plan Summary:"
+        terraform show -no-color tfplan
+
+    - name: Terraform Apply
+      working-directory: ./infra
+      run: |
+        echo "🚀 Applying Terraform changes to Main Branch"
+        terraform apply -auto-approve tfplan
+        
+        echo "✅ Terraform Apply completed successfully"
+
+    - name: Terraform Output
+      working-directory: ./infra
+      run: |
+        echo "📤 Terraform Outputs:"
+        terraform output
+
+    - name: Set variables
+      working-directory: ./infra
+      run: |
+        REPOSITORY_URI=$(terraform output -raw repository_uri)
+        gh variable set REPOSITORY_URI -b "$REPOSITORY_URI"
+
+        REGISTRY_URI=$(terraform output -raw registry_uri)
+        gh variable set REGISTRY_URI -b "$REGISTRY_URI"
