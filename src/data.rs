@@ -82,26 +82,6 @@ pub async fn list_users_by_website(
     Ok(uss)
 }
 
-pub fn compare_websites(
-    conn: &mut SqliteConnection,
-    webs: Vec<Website>,
-) -> Result<Vec<Website>, diesel::result::Error> {
-    let current_websites: Vec<Website> = get_all_websites(conn)?;
-
-    let mut changed_websites: Vec<Website> = Vec::new();
-
-    // compare and list websites only which have changed status
-    for web in &webs {
-        if let Some(current) = current_websites.iter().find(|&c| c.id == web.id) {
-            if current.status != web.status {
-                changed_websites.push(web.clone());
-            }
-        }
-    }
-
-    Ok(changed_websites)
-}
-
 pub fn write_all_websites(
     conn: &mut SqliteConnection,
     webs: Vec<Website>,
