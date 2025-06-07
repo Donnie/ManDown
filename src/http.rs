@@ -15,18 +15,22 @@ pub trait HttpClient: Clone + Send + Sync {
 #[async_trait::async_trait]
 impl HttpClient for reqwest::Client {
     async fn check_url(&self, url: &str) -> bool {
-        let res = self.get(url)
-            .timeout(std::time::Duration::from_secs(30))
-            .send().await;
+        let res = self.get(url).send().await;
         res.is_ok()
     }
 
     async fn get_status_code(&self, url: &str) -> Result<u16, reqwest::Error> {
-        let res = self.get(url)
-            .timeout(std::time::Duration::from_secs(30))
-            .send().await?;
+        let res = self.get(url).send().await?;
         Ok(res.status().as_u16())
     }
+}
+
+// Function to create a client with preset timeout
+pub fn cust_client(timeout: u64) -> Client {
+    Client::builder()
+        .timeout(std::time::Duration::from_secs(timeout))
+        .build()
+        .expect("Failed to build HTTP client")
 }
 
 // Function to update HTTP status of each website
@@ -37,18 +41,19 @@ pub async fn update_http_status(webs: &mut [Website]) {
         return;
     }
 
+    let client = cust_client(30);
+
     // Create a vector to store all the futures
-    let futures: Vec<_> = webs.iter_mut().map(update_web_status).collect();
+    let futures: Vec<_> = webs.iter_mut().map(|web| update_web_status(web, &client)).collect();
 
     // Wait for all futures to complete
     join_all(futures).await;
 }
 
-async fn update_web_status(web: &mut Website) {
+async fn update_web_status(web: &mut Website, client: &Client) {
     let datetime: DateTime<Utc> = SystemTime::now().into();
     web.last_checked_time = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
 
-    let client = Client::new();
     match client.get_status_code(&web.url).await {
         Ok(status) => web.status = status as i32,
         Err(_e) => web.status = 0,
@@ -125,5 +130,81 @@ mod tests {
             )
             .await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_update_web_status_real_website() {
+        let mut website = Website {
+            id: 1,
+            last_checked_time: "2020-01-01 00:00:00".to_string(),
+            status: 0,
+            url: "https://www.google.com".to_string(),
+        };
+        
+        let client = cust_client(5);
+        update_web_status(&mut website, &client).await;
+
+        // Check that the timestamp was updated (should not be the old value)
+        assert_ne!(website.last_checked_time, "2020-01-01 00:00:00");
+        
+        // Check that status was updated to a valid HTTP status code (200)
+        assert_eq!(website.status, 200);
+    }
+
+    #[tokio::test]
+    async fn test_update_web_status_fake_website() {
+        let mut website = Website {
+            id: 2,
+            last_checked_time: "2020-01-01 00:00:00".to_string(),
+            status: 200,
+            url: "https://this-is-a-fake-website-that-does-not-exist-123456789.com".to_string(),
+        };
+
+        let client = cust_client(5);
+        update_web_status(&mut website, &client).await;
+
+        // Check that the timestamp was updated
+        assert_ne!(website.last_checked_time, "2020-01-01 00:00:00");
+        
+        // Check that status was set to 0 (indicating failure)
+        assert_eq!(website.status, 0);
+    }
+
+    #[tokio::test]
+    async fn test_update_web_status_timeout() {
+        let mut website = Website {
+            id: 3,
+            last_checked_time: "2020-01-01 00:00:00".to_string(),
+            status: 200,
+            url: "http://10.255.255.1:80".to_string(), // Non-routable IP that will timeout
+        };
+
+        let client = cust_client(5);
+        update_web_status(&mut website, &client).await;
+
+        // Check that the timestamp was updated
+        assert_ne!(website.last_checked_time, "2020-01-01 00:00:00");
+        
+        // Check that status was set to 0 (indicating timeout/failure)
+        assert_eq!(website.status, 0);
+    }
+
+    #[tokio::test]
+    async fn test_update_web_status_invalid_url() {
+        let mut website = Website {
+            id: 4,
+            last_checked_time: "2020-01-01 00:00:00".to_string(),
+            status: 200,
+            url: "not-a-valid-url".to_string(),
+        };
+
+        let client = cust_client(5);
+        update_web_status(&mut website, &client).await;
+
+        // Check that the timestamp was updated
+        assert_ne!(website.last_checked_time, "2020-01-01 00:00:00");
+        
+        // Check that status was set to 0 (indicating failure)
+        assert_eq!(website.status, 0);
     }
 }
