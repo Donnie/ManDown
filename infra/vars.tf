@@ -12,8 +12,3 @@ variable "repository_name" {
   description = "Artifact Registry Repository Name"
   type        = string
 }
-
-variable "state_bucket" {
-  description = "State Bucket Name"
-  type        = string
-}

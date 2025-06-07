@@ -13,7 +13,7 @@ terraform {
   }
 
   backend "gcs" {
-    bucket = var.state_bucket
+    bucket = "state-mandown"
     prefix = "state"
   }
 }
