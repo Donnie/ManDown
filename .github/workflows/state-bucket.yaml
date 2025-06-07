@@ -44,7 +44,7 @@ jobs:
           echo "🔨 Creating bucket '$BUCKET_NAME'..."
           
           # Create the bucket
-          if gsutil mb gs://$BUCKET_NAME; then
+          if gsutil mb -b on gs://$BUCKET_NAME; then
             echo "✅ Successfully created bucket '$BUCKET_NAME'"
           else
             echo "❌ Failed to create bucket '$BUCKET_NAME'"
