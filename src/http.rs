@@ -221,6 +221,12 @@ mod tests {
                 last_checked_time: random_date.clone(),
                 status: 30,
                 url: "not-a-valid-url".to_string(),
+            },
+            Website {
+                id: 4,
+                last_checked_time: random_date.clone(),
+                status: 200,
+                url: "http://10.255.255.1:80".to_string(), // Non-routable IP that will timeout
             }
         ];
 
@@ -236,5 +242,6 @@ mod tests {
         assert_eq!(websites[0].status, 200); // Google should be accessible
         assert_eq!(websites[1].status, 0);   // Fake website should fail
         assert_eq!(websites[2].status, 0);   // Invalid URL should fail
+        assert_eq!(websites[3].status, 0);   // Timeout should fail
     }
 }
