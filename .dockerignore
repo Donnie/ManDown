@@ -3,7 +3,6 @@
 .env.local
 db
 .git
-*.csv
 target
 .vscode
 .github
