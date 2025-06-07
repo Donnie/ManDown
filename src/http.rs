@@ -2,6 +2,7 @@ use crate::{baseline::baseline_available, schema::Website};
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use std::time::SystemTime;
+use reqwest::Client;
 
 // Trait for HTTP clients to enable testing
 #[async_trait::async_trait]
@@ -14,15 +15,16 @@ pub trait HttpClient: Clone + Send + Sync {
 #[async_trait::async_trait]
 impl HttpClient for reqwest::Client {
     async fn check_url(&self, url: &str) -> bool {
-        self.get(url).send().await.is_ok()
+        let res = self.get(url)
+            .timeout(std::time::Duration::from_secs(30))
+            .send().await;
+        res.is_ok()
     }
 
     async fn get_status_code(&self, url: &str) -> Result<u16, reqwest::Error> {
-        let res = self
-            .get(url)
-            .timeout(std::time::Duration::from_secs(5))
-            .send()
-            .await?;
+        let res = self.get(url)
+            .timeout(std::time::Duration::from_secs(30))
+            .send().await?;
         Ok(res.status().as_u16())
     }
 }
@@ -46,18 +48,11 @@ async fn update_web_status(web: &mut Website) {
     let datetime: DateTime<Utc> = SystemTime::now().into();
     web.last_checked_time = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(5))
-        .build()
-        .unwrap();
-    match get_status(&web.url, &client).await {
+    let client = Client::new();
+    match client.get_status_code(&web.url).await {
         Ok(status) => web.status = status as i32,
         Err(_e) => web.status = 0,
     }
-}
-
-pub async fn get_status<C: HttpClient>(url: &str, client: &C) -> Result<u16, reqwest::Error> {
-    client.get_status_code(url).await
 }
 
 #[cfg(test)]
@@ -97,7 +92,7 @@ mod tests {
             status_code: Arc::new(AtomicBool::new(true)),
         };
 
-        let result = get_status("https://example.com", &client).await;
+        let result = client.get_status_code("https://example.com").await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 200);
     }
@@ -109,14 +104,14 @@ mod tests {
             status_code: Arc::new(AtomicBool::new(false)),
         };
 
-        let result = get_status("https://example.com", &client).await;
+        let result = client.get_status_code("https://example.com").await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn test_get_status_real_success() {
         let client = reqwest::Client::new();
-        let result = get_status("https://www.google.com", &client).await;
+        let result = client.get_status_code("https://www.google.com").await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 200);
     }
@@ -124,11 +119,11 @@ mod tests {
     #[tokio::test]
     async fn test_get_status_real_failure() {
         let client = reqwest::Client::new();
-        let result = get_status(
-            "https://this-is-a-fake-website-that-does-not-exist.com",
-            &client,
-        )
-        .await;
+        let result = client
+            .get_status_code(
+                "https://this-is-a-fake-website-that-does-not-exist.com",
+            )
+            .await;
         assert!(result.is_err());
     }
 }
