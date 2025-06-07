@@ -24,6 +24,7 @@ jobs:
       uses: 'google-github-actions/auth@v2'
       with:
         create_credentials_file: 'true'
+        project_id: ${{ vars.GCP_PROJECT_ID }}
         workload_identity_provider: ${{ vars.GCP_WIF }}
 
     - name: Set up Cloud SDK
