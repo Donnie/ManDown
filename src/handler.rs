@@ -4,7 +4,7 @@ use crate::data::{
     delete_user, delete_user_website, delete_website, get_user_by_telegram_id, get_websites_by_url,
     list_users_by_website,
 };
-use crate::http::{cust_client, HttpClient};
+use crate::http::{HttpClient, cust_client};
 use crate::insert::put_user_website;
 use crate::parse_url::{extract_hostname, read_url};
 use diesel::r2d2::{self, ConnectionManager};

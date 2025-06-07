@@ -22,7 +22,7 @@ impl HttpClient for reqwest::Client {
     async fn get_status_code(&self, url: &str) -> u16 {
         match self.get(url).send().await {
             Ok(res) => res.status().as_u16(),
-            Err(_) => 0
+            Err(_) => 0,
         }
     }
 }
@@ -124,7 +124,9 @@ mod tests {
     #[tokio::test]
     async fn test_get_status_real_failure() {
         let client = reqwest::Client::new();
-        let result = client.get_status_code("https://this-is-a-fake-website-that-does-not-exist.com").await;
+        let result = client
+            .get_status_code("https://this-is-a-fake-website-that-does-not-exist.com")
+            .await;
         assert_eq!(result, 0);
     }
 
