@@ -81,8 +81,7 @@ fn compare_websites<'a>(
     webs.iter()
         .filter(move |web| {
             updated_map
-                .get(&web.id)
-                .map_or(false, |&new_status| new_status != web.status)
+                .get(&web.id).is_some_and(|&new_status| new_status != web.status)
         })
         .cloned()
 }
