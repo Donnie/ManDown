@@ -1,5 +1,5 @@
-use crate::{config::Config, http::cust_client};
 use crate::http::HttpClient;
+use crate::{config::Config, http::cust_client};
 use futures::{StreamExt, stream::FuturesUnordered};
 
 pub async fn baseline_available() -> bool {
@@ -22,9 +22,7 @@ async fn check_websites<T: HttpClient + 'static>(websites: &[String], client: &T
     // Use FuturesUnordered for efficient concurrent execution with early termination
     let mut futures = websites
         .iter()
-        .map(|site| {
-            async move { client.check_url(site).await }
-        })
+        .map(|site| async move { client.check_url(site).await })
         .collect::<FuturesUnordered<_>>();
 
     // Return true as soon as any future resolves to true

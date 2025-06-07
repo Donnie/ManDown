@@ -155,7 +155,7 @@ mod tests {
             Website {
                 id: 5,
                 last_checked_time: "2025-01-01 00:00:00".to_string(), // changed from 2024 to 2025
-                status: 200, // unchanged
+                status: 200,                                          // unchanged
                 url: "https://example4.com".to_string(),
             },
         ];

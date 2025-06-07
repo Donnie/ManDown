@@ -1,8 +1,8 @@
 use crate::schema::Website;
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
-use std::time::SystemTime;
 use reqwest::Client;
+use std::time::SystemTime;
 
 // Trait for HTTP clients to enable testing
 #[async_trait::async_trait]
@@ -36,7 +36,10 @@ pub fn cust_client(timeout: u64) -> Client {
 // Function to update HTTP status of each website
 pub async fn update_http_statuses(webs: &mut [Website], client: &Client) {
     // Create a vector to store all the futures
-    let futures: Vec<_> = webs.iter_mut().map(|web| update_http_status(web, &client)).collect();
+    let futures: Vec<_> = webs
+        .iter_mut()
+        .map(|web| update_http_status(web, &client))
+        .collect();
 
     // Wait for all futures to complete
     join_all(futures).await;
@@ -117,9 +120,7 @@ mod tests {
     async fn test_get_status_real_failure() {
         let client = reqwest::Client::new();
         let result = client
-            .get_status_code(
-                "https://this-is-a-fake-website-that-does-not-exist.com",
-            )
+            .get_status_code("https://this-is-a-fake-website-that-does-not-exist.com")
             .await;
         assert!(result.is_err());
     }
@@ -132,13 +133,13 @@ mod tests {
             status: 0,
             url: "https://www.google.com".to_string(),
         };
-        
+
         let client = cust_client(5);
         update_http_status(&mut website, &client).await;
 
         // Check that the timestamp was updated (should not be the old value)
         assert_ne!(website.last_checked_time, "2020-01-01 00:00:00");
-        
+
         // Check that status was updated to a valid HTTP status code (200)
         assert_eq!(website.status, 200);
     }
@@ -157,7 +158,7 @@ mod tests {
 
         // Check that the timestamp was updated
         assert_ne!(website.last_checked_time, "2020-01-01 00:00:00");
-        
+
         // Check that status was set to 0 (indicating failure)
         assert_eq!(website.status, 0);
     }
@@ -176,7 +177,7 @@ mod tests {
 
         // Check that the timestamp was updated
         assert_ne!(website.last_checked_time, "2020-01-01 00:00:00");
-        
+
         // Check that status was set to 0 (indicating timeout/failure)
         assert_eq!(website.status, 0);
     }
@@ -195,7 +196,7 @@ mod tests {
 
         // Check that the timestamp was updated
         assert_ne!(website.last_checked_time, "2020-01-01 00:00:00");
-        
+
         // Check that status was set to 0 (indicating failure)
         assert_eq!(website.status, 0);
     }
@@ -227,7 +228,7 @@ mod tests {
                 last_checked_time: random_date.clone(),
                 status: 200,
                 url: "http://10.255.255.1:80".to_string(), // Non-routable IP that will timeout
-            }
+            },
         ];
 
         let client = cust_client(5);
@@ -240,8 +241,8 @@ mod tests {
 
         // Check specific status codes
         assert_eq!(websites[0].status, 200); // Google should be accessible
-        assert_eq!(websites[1].status, 0);   // Fake website should fail
-        assert_eq!(websites[2].status, 0);   // Invalid URL should fail
-        assert_eq!(websites[3].status, 0);   // Timeout should fail
+        assert_eq!(websites[1].status, 0); // Fake website should fail
+        assert_eq!(websites[2].status, 0); // Invalid URL should fail
+        assert_eq!(websites[3].status, 0); // Timeout should fail
     }
 }

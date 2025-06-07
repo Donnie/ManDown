@@ -9,8 +9,8 @@ use crate::insert::put_user_website;
 use crate::parse_url::{extract_hostname, read_url};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
-use teloxide::{prelude::*, types::ParseMode};
 use reqwest::Client;
+use teloxide::{prelude::*, types::ParseMode};
 
 pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
     let output = "<b>ManDown</b>:
