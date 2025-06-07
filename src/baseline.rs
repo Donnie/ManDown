@@ -4,10 +4,14 @@ use futures::{StreamExt, stream::FuturesUnordered};
 
 pub async fn baseline_available() -> bool {
     let config = Config::load().expect("Failed to load config");
-    check_websites(&config.baseline_sites, reqwest::Client::new()).await
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .expect("Failed to create HTTP client");
+    check_websites(&config.baseline_sites, client).await
 }
 
-pub async fn check_websites<T: HttpClient + 'static>(websites: &[String], client: T) -> bool {
+async fn check_websites<T: HttpClient + 'static>(websites: &[String], client: T) -> bool {
     // Early return for empty list
     if websites.is_empty() {
         return false;
