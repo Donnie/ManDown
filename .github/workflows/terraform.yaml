@@ -14,16 +14,17 @@ on:
       - 'infra/**'
 
 env:
-  BUCKET_NAME: ${{ vars.STATE_BUCKET_NAME }}
-  GH_TOKEN: ${{ secrets.SWEM_PAT }}
+  GH_TOKEN: ${{ secrets.MANDOWN_PAT }}
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
 
 jobs:
   terraform-plan:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
-      pull-requests: write
 
     steps:
     - name: Checkout code
@@ -71,7 +72,7 @@ jobs:
     - name: Terraform Init
       working-directory: ./infra
       run: |
-        terraform init -backend-config="bucket=$BUCKET_NAME"
+        terraform init
 
     - name: Terraform Validate
       working-directory: ./infra
@@ -171,7 +172,7 @@ jobs:
     - name: Terraform Init
       working-directory: ./infra
       run: |
-        terraform init -backend-config="bucket=$BUCKET_NAME"
+        terraform init
 
     - name: Terraform Plan
       working-directory: ./infra
