@@ -38,7 +38,7 @@ pub async fn update_http_statuses(webs: &mut [Website], client: &Client) {
     // Create a vector to store all the futures
     let futures: Vec<_> = webs
         .iter_mut()
-        .map(|web| update_http_status(web, &client))
+        .map(|web| update_http_status(web, client))
         .collect();
 
     // Wait for all futures to complete

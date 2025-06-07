@@ -8,6 +8,7 @@ use diesel::sqlite::SqliteConnection;
 use log::info;
 use teloxide::Bot;
 use tokio::time;
+use std::collections::HashMap;
 
 pub async fn check_urls(
     pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
@@ -49,7 +50,7 @@ async fn check_websites(conn: &mut SqliteConnection, bot: Bot) {
     let mut updated_webs = webs.clone();
     update_http_statuses(&mut updated_webs, &client).await;
 
-    let changed_webs = compare_websites(&webs, &updated_webs).expect("Error comparing Websites");
+    let changed_webs: Vec<_> = compare_websites(&webs, &updated_webs).collect();
     let web_count: usize = changed_webs.len();
 
     info!("{} websites changed", web_count);
@@ -66,22 +67,24 @@ async fn check_websites(conn: &mut SqliteConnection, bot: Bot) {
 }
 
 // Function to compare websites and list only those which have changed status
-fn compare_websites(
-    webs: &Vec<Website>,
-    updated_webs: &Vec<Website>,
-) -> Result<Vec<Website>, diesel::result::Error> {
-    let mut changed_websites: Vec<Website> = Vec::new();
+fn compare_websites<'a>(
+    webs: &'a [Website],
+    updated_webs: &[Website],
+) -> impl Iterator<Item = Website> + 'a {
+    // Create a map of id -> status for O(1) lookups
+    let updated_map: HashMap<i32, i32> = updated_webs
+        .iter()
+        .map(|w| (w.id, w.status))
+        .collect();
 
-    // compare and list websites only which have changed status
-    for web in webs {
-        if let Some(updated) = updated_webs.iter().find(|&c| c.id == web.id) {
-            if updated.status != web.status {
-                changed_websites.push(web.clone());
-            }
-        }
-    }
-
-    Ok(changed_websites)
+    // Return an iterator of owned Website instances
+    webs.iter()
+        .filter(move |web| {
+            updated_map
+                .get(&web.id)
+                .map_or(false, |&new_status| new_status != web.status)
+        })
+        .cloned()
 }
 
 #[cfg(test)]
@@ -160,7 +163,7 @@ mod tests {
             },
         ];
 
-        let result = compare_websites(&original_websites, &updated_websites).unwrap();
+        let result: Vec<_> = compare_websites(&original_websites, &updated_websites).collect();
 
         // Should only include websites with changed status
         assert_eq!(result.len(), 3);
