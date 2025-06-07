@@ -5,6 +5,9 @@ on:
     paths:
       - '.github/workflows/state-bucket.yaml'
 
+permissions:
+  id-token: write
+
 jobs:
   create-bucket:
     runs-on: ubuntu-latest
