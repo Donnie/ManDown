@@ -1,6 +1,6 @@
 resource "google_artifact_registry_repository" "mandown" {
   location               = var.region
-  repository_id          = var.repository_name
+  repository_id          = var.app_name
   description            = "ManDown repo"
   format                 = "DOCKER"
   cleanup_policy_dry_run = false
