@@ -1,7 +1,7 @@
 use crate::alert::notify_user;
 use crate::baseline::baseline_available;
 use crate::data::{compare_websites, get_all_websites, write_all_websites};
-use crate::http::update_http_status;
+use crate::http::{cust_client, update_http_statuses};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
 use log::info;
@@ -41,8 +41,11 @@ async fn check_websites(conn: &mut SqliteConnection, bot: Bot) {
         return;
     }
 
+    // Create client
+    let client = cust_client(30);
+
     // Update HTTP status of each website
-    update_http_status(&mut webs).await;
+    update_http_statuses(&mut webs, &client).await;
 
     let changed_webs = compare_websites(conn, webs).expect("Error comparing Websites");
     let web_count: usize = changed_webs.len();
