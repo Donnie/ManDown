@@ -27,6 +27,11 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.ref }}
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
       - name: Get base version
         id: base
         run: |
@@ -78,13 +83,17 @@ jobs:
             new_patch=$((base_patch + 1))
             NEW_VERSION="${base_major}.${base_minor}.${new_patch}"
 
-            # Update pubspec.yaml with new version
+            # Update Cargo.toml with new version
             sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" Cargo.toml
             
+            # Update Cargo.lock with new version
+            cargo update --package man_down
+
             # Commit and push the change
             git config --local user.email "github-actions[bot]@users.noreply.github.com"
             git config --local user.name "github-actions[bot]"
             git add Cargo.toml
+            git add Cargo.lock
             # Check if there are changes to commit (sed might not change anything if version line is missing)
             if ! git diff --staged --quiet; then
               git commit -m "chore: auto-increment patch version to $NEW_VERSION"
