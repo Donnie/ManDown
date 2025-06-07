@@ -47,7 +47,7 @@ async fn check_websites(conn: &mut SqliteConnection, bot: Bot) {
 
     // Clone websites for updating - we need the original statuses for comparison
     let mut updated_webs = webs.clone();
-    
+
     // Update HTTP status of all websites in parallel
     update_http_statuses(&mut updated_webs, &client).await;
 
