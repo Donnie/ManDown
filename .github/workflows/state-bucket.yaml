@@ -1,0 +1,65 @@
+name: State Bucket
+
+on:
+  push:
+    paths:
+      - '.github/workflows/state-bucket.yaml'
+
+jobs:
+  create-bucket:
+    runs-on: ubuntu-latest
+    env:
+      BUCKET_NAME: ${{ vars.STATE_BUCKET_NAME }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      id: auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        create_credentials_file: 'true'
+        workload_identity_provider: ${{ vars.GCP_WIF }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        install_components: 'gsutil'
+        project_id: ${{ vars.GCP_PROJECT_ID }}
+
+    - name: Check if bucket exists and create if needed
+      run: |
+        echo "Checking if bucket '$BUCKET_NAME' exists..."
+        
+        # Check if bucket exists
+        if gsutil ls -b gs://$BUCKET_NAME 2>/dev/null; then
+          echo "✅ Bucket '$BUCKET_NAME' already exists"
+        else
+          echo "🔨 Creating bucket '$BUCKET_NAME'..."
+          
+          # Create the bucket
+          if gsutil mb gs://$BUCKET_NAME; then
+            echo "✅ Successfully created bucket '$BUCKET_NAME'"
+          else
+            echo "❌ Failed to create bucket '$BUCKET_NAME'"
+            exit 1
+          fi
+        fi
+        
+        echo "🔍 Listing bucket details:"
+        gsutil ls -L -b gs://$BUCKET_NAME
+
+    - name: Verify bucket access
+      run: |
+        DATETIME=$(date +%s)
+        echo "Test file created at $(date)" > test-file-$DATETIME.txt
+        gsutil cp test-file-$DATETIME.txt gs://$BUCKET_NAME/
+
+        gsutil ls gs://$BUCKET_NAME/
+
+        gsutil rm gs://$BUCKET_NAME/test-file-$DATETIME.txt
+        rm test-file-$DATETIME.txt
+
+        echo "✅ Bucket access verification completed"
