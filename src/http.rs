@@ -1,4 +1,4 @@
-use crate::{baseline::baseline_available, schema::Website};
+use crate::schema::Website;
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use std::time::SystemTime;
@@ -35,12 +35,6 @@ pub fn cust_client(timeout: u64) -> Client {
 
 // Function to update HTTP status of each website
 pub async fn update_http_status(webs: &mut [Website]) {
-    // Check baseline availability
-    let result = baseline_available().await;
-    if !result {
-        return;
-    }
-
     let client = cust_client(30);
 
     // Create a vector to store all the futures

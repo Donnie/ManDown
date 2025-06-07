@@ -1,4 +1,5 @@
 use crate::alert::notify_user;
+use crate::baseline::baseline_available;
 use crate::data::{compare_websites, get_all_websites, write_all_websites};
 use crate::http::update_http_status;
 use diesel::r2d2::{self, ConnectionManager};
@@ -28,8 +29,17 @@ pub async fn check_urls(
 async fn check_websites(conn: &mut SqliteConnection, bot: Bot) {
     info!("Checking Websites now");
 
+    // Check baseline availability
+    let result = baseline_available().await;
+    if !result {
+        return;
+    }
+
     // Read from DB
     let mut webs = get_all_websites(conn).expect("Error listing Websites");
+    if webs.is_empty() {
+        return;
+    }
 
     // Update HTTP status of each website
     update_http_status(&mut webs).await;
