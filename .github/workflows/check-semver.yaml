@@ -1,0 +1,98 @@
+name: Check Semver Update
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.dockerignore'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'config.yaml'
+      - 'diesel.toml'
+      - 'Dockerfile'
+      - 'migrations/**'
+      - 'src/**'
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-semver:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Get base version
+        id: base
+        run: |
+          git fetch --tags --force
+          LATEST_TAG=$(git tag --list '[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No version tags found, falling back to base branch Cargo.toml"
+            git fetch origin ${{ github.event.pull_request.base.ref }}
+            BASE_VERSION=$(git show origin/${{ github.event.pull_request.base.ref }}:Cargo.toml | grep '^version = ' | sed 's/version = "\(.*\)"/\1/')
+            if [ -z "$BASE_VERSION" ]; then
+              echo "Could not find version in base branch Cargo.toml either, defaulting to 0.0.0"
+              BASE_VERSION="0.0.0"
+            fi
+          else
+            # Remove potential 'v' prefix
+            BASE_VERSION=${LATEST_TAG#v}
+            echo "Base version from latest tag: $BASE_VERSION"
+          fi
+          echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get head version
+        id: head
+        run: |
+          HEAD_VERSION=$(grep '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "Head version from Cargo.toml: $HEAD_VERSION"
+          echo "head_version=$HEAD_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Auto-increment patch version if needed
+        id: auto-increment
+        run: |
+          BASE_VERSION="${{ steps.base.outputs.base_version }}"
+          HEAD_VERSION="${{ steps.head.outputs.head_version }}"
+
+          # Default output version is the head version
+          NEW_VERSION=$HEAD_VERSION
+
+          # Split versions for comparison
+          IFS='.' read -r base_major base_minor base_patch <<< "$BASE_VERSION"
+          IFS='.' read -r head_major head_minor head_patch <<< "$HEAD_VERSION"
+
+          # Check if head version is NOT greater than base version
+          if ! ([ "$head_major" -gt "$base_major" ] || \
+                ([ "$head_major" -eq "$base_major" ] && [ "$head_minor" -gt "$base_minor" ]) || \
+                ([ "$head_major" -eq "$base_major" ] && [ "$head_minor" -eq "$base_minor" ] && [ "$head_patch" -gt "$base_patch" ])); then
+            
+            echo "HEAD version ($HEAD_VERSION) is not ahead of BASE version ($BASE_VERSION)."
+
+            # Increment patch version based on BASE
+            new_patch=$((base_patch + 1))
+            NEW_VERSION="${base_major}.${base_minor}.${new_patch}"
+
+            # Update pubspec.yaml with new version
+            sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" Cargo.toml
+            
+            # Commit and push the change
+            git config --local user.email "github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git add Cargo.toml
+            # Check if there are changes to commit (sed might not change anything if version line is missing)
+            if ! git diff --staged --quiet; then
+              git commit -m "chore: auto-increment patch version to $NEW_VERSION"
+              git push origin HEAD:${{ github.event.pull_request.head.ref }}
+              echo "Auto-incremented version from $HEAD_VERSION to $NEW_VERSION"
+            else
+              echo "No changes to commit for auto-increment."
+            fi
+          else
+            echo "HEAD version ($HEAD_VERSION) is already ahead of BASE version ($BASE_VERSION). No auto-increment needed."
+          fi
