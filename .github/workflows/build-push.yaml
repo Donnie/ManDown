@@ -1,57 +1,78 @@
 name: ManDown Build and Deploy
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    tags:
+      - "*.*.*"
+
+permissions:
+  contents: write
 
 jobs:
   build:
+    name: Build and Push
     runs-on: ubuntu-latest
     steps:
-    - name: "Checkout source code"
-      uses: actions/checkout@v4
+      - name: "Checkout source code"
+        uses: actions/checkout@v4
+    
+      - name: Find Cargo tag
+        run: |
+          tag=$(grep "^version = " Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "CARGO_TAG=$tag" >> $GITHUB_ENV
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Verify version consistency
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Cargo tag: $CARGO_TAG"
+          echo "Tag version: $GITHUB_REF"
 
-    - name: Cache Docker layers
-      uses: actions/cache@v3
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-buildx-
+          if [ "$CARGO_TAG" != "$GITHUB_REF" ]; then
+            # Delete the tag
+            gh api -X DELETE /repos/${{ github.repository }}/git/refs/tags/${{ env.GITHUB_REF }}
+            echo "Error: Cargo tag ($CARGO_TAG) does not match tag version ($GITHUB_REF)."
+            exit 1
+          fi
+          echo "Version check passed."
 
-    - name: Login to DockerHub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USER }}
-        password: ${{ secrets.DOCKER_PASS }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: "Build and push docker image"
-      uses: docker/build-push-action@v4
-      with:
-        cache-from: type=local,src=/tmp/.buildx-cache
-        cache-to: type=local,dest=/tmp/.buildx-cache-new
-        tags: donnieashok/mandown:prod
-        push: true
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
 
-    - name: Move cache
-      run: |
-        rm -rf /tmp/.buildx-cache
-        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASS }}
 
-    - name: Pull image into production
-      uses: appleboy/ssh-action@v1
-      with:
-        host: ${{ secrets.GCP_HOST }}
-        username: ${{ secrets.GCP_USER }}
-        key: ${{ secrets.GCP_SECRET }}
-        script: |
-          sudo docker pull donnieashok/mandown:prod
-          sudo docker stop mandown || true
-          sudo docker rm mandown || true
-          echo "${{ secrets.ENV }}" > ~/mandown/.env
-          sudo docker run -d --restart on-failure -v ~/mandown/db:/db --env-file ~/mandown/.env --name mandown donnieashok/mandown:prod
-          rm ~/mandown/.env
+      - name: "Build and push docker image"
+        uses: docker/build-push-action@v4
+        with:
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
+          tags: donnieashok/mandown:${{ env.GITHUB_REF }}
+          push: true
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: Pull image into production
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_SECRET }}
+          script: |
+            sudo docker pull donnieashok/mandown:${{ env.GITHUB_REF }}
+            sudo docker stop mandown || true
+            sudo docker rm mandown || true
+            echo "${{ secrets.ENV }}" > ~/mandown/.env
+            sudo docker run -d --restart on-failure -v ~/mandown/db:/db --env-file ~/mandown/.env --name mandown donnieashok/mandown:${{ env.GITHUB_REF }}
+            rm ~/mandown/.env
