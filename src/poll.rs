@@ -8,7 +8,6 @@ use diesel::sqlite::SqliteConnection;
 use log::info;
 use teloxide::Bot;
 use tokio::time;
-use std::collections::HashMap;
 
 pub async fn check_urls(
     pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
@@ -46,13 +45,16 @@ async fn check_websites(conn: &mut SqliteConnection, bot: Bot) {
     // Create client
     let client = cust_client(30);
 
-    // Update HTTP status of each website
+    // Clone websites for updating - we need the original statuses for comparison
     let mut updated_webs = webs.clone();
+    
+    // Update HTTP status of all websites in parallel
     update_http_statuses(&mut updated_webs, &client).await;
 
-    let changed_webs: Vec<_> = compare_websites(&webs, &updated_webs).collect();
-    let web_count: usize = changed_webs.len();
+    // Find websites that have changed status
+    let changed_webs = compare_websites(&webs, &updated_webs);
 
+    let web_count = changed_webs.len();
     info!("{} websites changed", web_count);
 
     if web_count == 0 {
@@ -63,32 +65,27 @@ async fn check_websites(conn: &mut SqliteConnection, bot: Bot) {
     notify_user(conn, bot, changed_webs.clone()).await;
 
     // Write updated websites back to DB
-    write_all_websites(conn, changed_webs.clone()).expect("Error updating Websites");
+    write_all_websites(conn, changed_webs).expect("Error updating Websites");
 }
 
-// Function to compare websites and list only those which have changed status
-fn compare_websites<'a>(
-    webs: &'a [Website],
-    updated_webs: &[Website],
-) -> impl Iterator<Item = Website> + 'a {
-    // Create a map of id -> status for O(1) lookups
-    let updated_map: HashMap<i32, i32> = updated_webs
+// Function to find websites that have changed status
+fn compare_websites(original_webs: &[Website], updated_webs: &[Website]) -> Vec<Website> {
+    original_webs
         .iter()
-        .map(|w| (w.id, w.status))
-        .collect();
-
-    // Return an iterator of owned Website instances
-    webs.iter()
-        .filter(move |web| {
-            updated_map
-                .get(&web.id).is_some_and(|&new_status| new_status != web.status)
+        .zip(updated_webs.iter())
+        .filter_map(|(original, updated)| {
+            if original.status != updated.status {
+                Some(updated.clone()) // Clone the updated website with new status
+            } else {
+                None
+            }
         })
-        .cloned()
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::compare_websites;
     use crate::schema::Website;
 
     #[test]
@@ -151,7 +148,7 @@ mod tests {
             Website {
                 id: 4,
                 last_checked_time: random_date.clone(),
-                status: 200, // unchanged
+                status: 200, // changed from 0
                 url: "https://example4.com".to_string(),
             },
             Website {
@@ -162,7 +159,8 @@ mod tests {
             },
         ];
 
-        let result: Vec<_> = compare_websites(&original_websites, &updated_websites).collect();
+        // Use the same logic as in check_websites function
+        let result = compare_websites(&original_websites, &updated_websites);
 
         // Should only include websites with changed status
         assert_eq!(result.len(), 3);
