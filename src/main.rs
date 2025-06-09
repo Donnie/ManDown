@@ -1,5 +1,4 @@
 mod poll;
-use poll::check_urls;
 
 mod handler;
 use handler::{handle_about, handle_list, handle_track, handle_untrack};
@@ -19,7 +18,12 @@ use diesel::sqlite::SqliteConnection;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use dotenvy::dotenv;
 
+use mongodb::bson::Document;
+use mongodb::{Client, options::ClientOptions};
+use std::sync::Arc;
 use teloxide::{prelude::*, utils::command::BotCommands};
+
+use crate::poll::downtime_check;
 
 #[derive(BotCommands, Clone)]
 #[command(
@@ -90,6 +94,15 @@ async fn main() {
 
     let pool = establish_connection();
 
+    // Initialize MongoDB client
+    let uri = dotenvy::var("MONGODB_URI").expect("MONGODB_URI must be set");
+    let client_options = ClientOptions::parse(uri)
+        .await
+        .expect("Failed to parse MongoDB URI");
+    let client = Client::with_options(client_options).expect("Failed to create MongoDB client");
+    let db = client.database("mandown");
+    let collection = Arc::new(db.collection::<Document>("websites"));
+
     // Run migrations using a connection from the pool
     let mut conn = pool.get().expect("Failed to get connection from pool");
     conn.run_pending_migrations(MIGRATIONS)
@@ -106,9 +119,9 @@ async fn main() {
 
     // Start the polling function in the background
     let bot_clone = bot.clone();
-    let pool_clone = pool.clone();
+    let collection_clone = collection.clone();
     tokio::spawn(async move {
-        check_urls(pool_clone, interval, bot_clone).await;
+        downtime_check(&collection_clone, interval, bot_clone).await;
     });
 
     // Start the bot's command loop
