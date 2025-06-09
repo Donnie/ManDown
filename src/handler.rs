@@ -34,7 +34,7 @@ pub async fn handle_list(
     // Find documents matching the filter
     let mut cursor = collection.find(filter).await.map_err(|e| {
         log::error!("Failed to query MongoDB: {}", e);
-        RequestError::from(std::io::Error::new(std::io::ErrorKind::Other, e))
+        RequestError::from(std::io::Error::other(e))
     })?;
 
     // Collect all website URLs into a vector
@@ -48,10 +48,7 @@ pub async fn handle_list(
             }
             Err(e) => {
                 log::error!("Failed to read document: {}", e);
-                return Err(RequestError::from(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    e,
-                )));
+                return Err(RequestError::from(std::io::Error::other(e)));
             }
         }
     }
