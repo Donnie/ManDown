@@ -7,3 +7,4 @@ main
 /target
 .vscode
 .DS_Store
+mandown.json

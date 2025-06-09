@@ -3,6 +3,11 @@ variable "app_name" {
   type        = string
 }
 
+variable "image" {
+  description = "Docker image"
+  type        = string
+}
+
 variable "project_id" {
   description = "GCP Project ID"
   type        = string
@@ -10,5 +15,10 @@ variable "project_id" {
 
 variable "region" {
   description = "GCP Region"
+  type        = string
+}
+
+variable "zone" {
+  description = "GCP Zone"
   type        = string
 }

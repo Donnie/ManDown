@@ -1,14 +1,11 @@
 use crate::alert::process;
-use crate::data::list_websites_by_user;
-use crate::data::{
-    delete_user, delete_user_website, delete_website, get_user_by_telegram_id, get_websites_by_url,
-    list_users_by_website,
-};
 use crate::http::{HttpClient, cust_client};
-use crate::insert::put_user_website;
+use crate::mongo::{delete_sites_by_hostname, put_site};
 use crate::parse_url::{extract_hostname, read_url};
-use diesel::r2d2::{self, ConnectionManager};
-use diesel::sqlite::SqliteConnection;
+use futures::{StreamExt, join};
+use mongodb::Collection;
+use mongodb::bson::{Document, doc};
+use teloxide::RequestError;
 use teloxide::{prelude::*, types::ParseMode};
 
 pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
@@ -27,21 +24,43 @@ pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
 pub async fn handle_list(
     bot: Bot,
     msg: Message,
-    pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
+    collection: &Collection<Document>,
 ) -> ResponseResult<()> {
-    let mut conn = pool.get().expect("Failed to get connection from pool");
     let telegram_id = msg.from().unwrap().id.0 as i32;
-    let webs = list_websites_by_user(&mut conn, telegram_id)
-        .await
-        .expect("Error listing Websites");
 
-    let websites = webs
-        .iter()
-        .map(|record| record.url.as_str())
-        .collect::<Vec<&str>>()
-        .join("\n");
+    // Create a filter to match documents with the user's telegram_id
+    let filter = doc! { "telegram_id": format!("{}", telegram_id) };
 
-    let output = format!("Here are your tracked domains:\n\n<pre>{}</pre>", websites);
+    // Find documents matching the filter
+    let mut cursor = collection.find(filter).await.map_err(|e| {
+        log::error!("Failed to query MongoDB: {}", e);
+        RequestError::from(std::io::Error::other(e))
+    })?;
+
+    // Collect all website URLs into a vector
+    let mut websites: Vec<String> = Vec::new();
+    while let Some(doc) = cursor.next().await {
+        match doc {
+            Ok(doc) => {
+                if let Ok(url) = doc.get_str("url") {
+                    websites.push(url.to_string());
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to read document: {}", e);
+                return Err(RequestError::from(std::io::Error::other(e)));
+            }
+        }
+    }
+
+    websites.sort();
+
+    // Create a formatted list of websites
+    let websites_list = websites.join("\n");
+    let output = format!(
+        "Here are your tracked domains:\n\n<pre>{}</pre>",
+        websites_list
+    );
 
     bot.send_message(msg.chat.id, output)
         .parse_mode(ParseMode::Html)
@@ -50,13 +69,30 @@ pub async fn handle_list(
     Ok(())
 }
 
+async fn check_and_track_url(
+    url: &str,
+    collection: &Collection<Document>,
+    telegram_id: i32,
+    client: &reqwest::Client,
+) -> ResponseResult<Option<String>> {
+    let status = client.get_status_code(url).await;
+    let message = process(url, status as i32);
+
+    if status == 200 {
+        put_site(collection, url, telegram_id)
+            .await
+            .unwrap_or_else(|_| panic!("Error inserting site {}", url));
+    }
+
+    Ok(Some(message))
+}
+
 pub async fn handle_track(
     bot: Bot,
     msg: Message,
     website: String,
-    pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
+    collection: &Collection<Document>,
 ) -> ResponseResult<()> {
-    let mut conn = pool.get().expect("Failed to get connection from pool");
     let telegram_id = msg.from().unwrap().id.0 as i32;
 
     let (valid, normal, ssl) = read_url(&website);
@@ -68,31 +104,20 @@ pub async fn handle_track(
     }
 
     let client = cust_client(30);
+    let normal_check = check_and_track_url(&normal, collection, telegram_id, &client);
+    let ssl_check = check_and_track_url(&ssl, collection, telegram_id, &client);
 
-    let status = client.get_status_code(&normal).await;
-    let message = process(&normal, status as i32);
+    let (normal_result, ssl_result) = join!(normal_check, ssl_check);
 
-    bot.send_message(msg.chat.id, message)
-        .parse_mode(ParseMode::Html)
-        .await?;
+    let messages: Vec<String> = [normal_result?, ssl_result?]
+        .into_iter()
+        .flatten()
+        .collect();
 
-    if status == 200 {
-        put_user_website(&mut conn, &normal, telegram_id)
-            .await
-            .unwrap_or_else(|_| panic!("Error inserting site {}", &normal));
-    }
-
-    let ssl_status = client.get_status_code(&ssl).await;
-
-    let message = process(&ssl, ssl_status as i32);
-    bot.send_message(msg.chat.id, message)
-        .parse_mode(ParseMode::Html)
-        .await?;
-
-    if ssl_status == 200 {
-        put_user_website(&mut conn, &ssl, telegram_id)
-            .await
-            .unwrap_or_else(|_| panic!("Error inserting site {}", &ssl));
+    if !messages.is_empty() {
+        bot.send_message(msg.chat.id, messages.join("\n\n"))
+            .parse_mode(ParseMode::Html)
+            .await?;
     }
 
     Ok(())
@@ -102,60 +127,31 @@ pub async fn handle_untrack(
     bot: Bot,
     msg: Message,
     website: String,
-    pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
+    collection: &Collection<Document>,
 ) -> ResponseResult<()> {
-    let mut conn = pool.get().expect("Failed to get connection from pool");
     let telegram_id = msg.from().unwrap().id.0 as i32;
-    let website = extract_hostname(&website);
+    let hostname = extract_hostname(&website);
+    if hostname.len() < 3 {
+        bot.send_message(msg.chat.id, "Invalid URL!".to_string())
+            .parse_mode(ParseMode::Html)
+            .await?;
+        return Ok(());
+    }
 
-    // get owner by telegram_id
-    let user = get_user_by_telegram_id(&mut conn, telegram_id)
-        .await
-        .expect("Error getting user");
+    let result = delete_sites_by_hostname(collection, &hostname, telegram_id).await;
 
-    // get sites matching url
-    let sites = get_websites_by_url(&mut conn, &website)
-        .await
-        .expect("Error getting website");
-
-    for site in sites {
-        delete_user_website(&mut conn, site.id, user.id)
-            .await
-            .expect("Error deleting user website");
-
-        // get list of owners from url
-        let owners = list_users_by_website(&mut conn, site.id)
-            .await
-            .expect("Error listing owners");
-
-        // if no owners then delete the website from the database
-        let owners_count = owners.len();
-        if owners_count == 0 {
-            delete_website(&mut conn, site.id)
-                .await
-                .expect("Error deleting website");
+    let message = match result {
+        Ok(0) => format!("No sites found for {}", hostname),
+        Ok(count) => format!("Successfully untracked {} site(s) for {}", count, hostname),
+        Err(e) => {
+            log::error!("Error untracking {}: {}", hostname, e);
+            format!("An error occurred while untracking {}", hostname)
         }
-    }
+    };
 
-    // get list of websites from telegram_id
-    let sites = list_websites_by_user(&mut conn, telegram_id)
-        .await
-        .expect("Error listing websites");
-
-    // if no sites then delete the owner from the database
-    let sites_count = sites.len();
-    if sites_count == 0 {
-        delete_user(&mut conn, user.id)
-            .await
-            .expect("Error deleting user");
-    }
-
-    bot.send_message(
-        msg.chat.id,
-        format!("Website {} untracked successfully!", website),
-    )
-    .parse_mode(ParseMode::Html)
-    .await?;
+    bot.send_message(msg.chat.id, message)
+        .parse_mode(ParseMode::Html)
+        .await?;
 
     Ok(())
 }

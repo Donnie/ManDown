@@ -1,6 +1,5 @@
-use crate::schema::Website;
+use crate::mongo::Website;
 use chrono::{DateTime, Utc};
-use futures::future::join_all;
 use reqwest::Client;
 use std::time::SystemTime;
 
@@ -36,36 +35,40 @@ pub fn cust_client(timeout: u64) -> Client {
 }
 
 // Function to update HTTP status of each website
-pub async fn update_http_statuses(webs: &mut [Website], client: &Client) {
-    // Create a vector to store all the futures
-    let futures: Vec<_> = webs
-        .iter_mut()
-        .map(|web| double_check_http_status(web, client))
-        .collect();
-
-    // Wait for all futures to complete
-    join_all(futures).await;
-}
-
-async fn update_http_status(web: &mut Website, client: &Client) {
-    let datetime: DateTime<Utc> = SystemTime::now().into();
-    web.last_checked_time = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
-    web.status = client.get_status_code(&web.url).await as i32;
-}
-
-// Function to update HTTP status with retry for failed checks
-async fn double_check_http_status(web: &mut Website, client: &Client) {
-    // First attempt
-    update_http_status(web, client).await;
+pub async fn get_status(client: &Client, url: &str) -> u16 {
+    let status = client.get_status_code(url).await;
 
     // If status is 0, retry once
-    if web.status == 0 {
-        update_http_status(web, client).await;
+    if status == 0 {
+        client.get_status_code(url).await
+    } else {
+        status
     }
+}
+
+pub fn find_changed_websites(original_webs: &[Website], new_statuses: &[u16]) -> Vec<Website> {
+    let datetime: DateTime<Utc> = SystemTime::now().into();
+    let timestamp = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+
+    original_webs
+        .iter()
+        .zip(new_statuses.iter())
+        .filter_map(|(web, &new_status)| {
+            if web.status != new_status as i32 {
+                let mut updated_web = web.clone();
+                updated_web.status = new_status as i32;
+                updated_web.last_updated = timestamp.clone();
+                Some(updated_web)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -116,14 +119,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_status_real_success() {
-        let client = reqwest::Client::new();
+        let client = cust_client(5);
         let result = client.get_status_code("https://www.google.com").await;
         assert_eq!(result, 200);
     }
 
     #[tokio::test]
     async fn test_get_status_real_failure() {
-        let client = reqwest::Client::new();
+        let client = cust_client(5);
         let result = client
             .get_status_code("https://this-is-a-fake-website-that-does-not-exist.com")
             .await;
@@ -131,123 +134,124 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_http_status_real_website() {
-        let mut website = Website {
-            id: 1,
-            last_checked_time: "2020-01-01 00:00:00".to_string(),
-            status: 0,
-            url: "https://www.google.com".to_string(),
-        };
-
+    async fn test_get_status_real_website() {
         let client = cust_client(5);
-        update_http_status(&mut website, &client).await;
-
-        // Check that the timestamp was updated (should not be the old value)
-        assert_ne!(website.last_checked_time, "2020-01-01 00:00:00");
-
-        // Check that status was updated to a valid HTTP status code (200)
-        assert_eq!(website.status, 200);
+        let status = get_status(&client, "https://www.google.com").await;
+        assert_eq!(status, 200);
     }
 
     #[tokio::test]
-    async fn test_update_http_status_fake_website() {
-        let mut website = Website {
-            id: 2,
-            last_checked_time: "2020-01-01 00:00:00".to_string(),
-            status: 200,
-            url: "https://this-is-a-fake-website-that-does-not-exist-123456789.com".to_string(),
-        };
-
+    async fn test_get_status_fake_website() {
         let client = cust_client(5);
-        update_http_status(&mut website, &client).await;
-
-        // Check that the timestamp was updated
-        assert_ne!(website.last_checked_time, "2020-01-01 00:00:00");
-
-        // Check that status was set to 0 (indicating failure)
-        assert_eq!(website.status, 0);
+        let status = get_status(
+            &client,
+            "https://this-is-a-fake-website-that-does-not-exist-123456789.com",
+        )
+        .await;
+        assert_eq!(status, 0);
     }
 
     #[tokio::test]
-    async fn test_update_http_status_timeout() {
-        let mut website = Website {
-            id: 3,
-            last_checked_time: "2020-01-01 00:00:00".to_string(),
-            status: 200,
-            url: "http://10.255.255.1:80".to_string(), // Non-routable IP that will timeout
-        };
-
-        let client = cust_client(5);
-        update_http_status(&mut website, &client).await;
-
-        // Check that the timestamp was updated
-        assert_ne!(website.last_checked_time, "2020-01-01 00:00:00");
-
-        // Check that status was set to 0 (indicating timeout/failure)
-        assert_eq!(website.status, 0);
+    async fn test_get_status_timeout() {
+        let client = cust_client(1); // 1 second timeout for faster test
+        let status = get_status(&client, "http://10.255.255.1:80").await; // Non-routable IP
+        assert_eq!(status, 0);
     }
 
     #[tokio::test]
-    async fn test_update_http_status_invalid_url() {
-        let mut website = Website {
-            id: 4,
-            last_checked_time: "2020-01-01 00:00:00".to_string(),
-            status: 200,
-            url: "not-a-valid-url".to_string(),
-        };
-
+    async fn test_get_status_invalid_url() {
         let client = cust_client(5);
-        update_http_status(&mut website, &client).await;
-
-        // Check that the timestamp was updated
-        assert_ne!(website.last_checked_time, "2020-01-01 00:00:00");
-
-        // Check that status was set to 0 (indicating failure)
-        assert_eq!(website.status, 0);
+        let status = get_status(&client, "not-a-valid-url").await;
+        assert_eq!(status, 0);
     }
 
-    #[tokio::test]
-    async fn test_update_http_statuses() {
-        let random_date = "2020-01-01 00:00:00".to_string();
-        let mut websites = vec![
+    use super::find_changed_websites;
+    use crate::mongo::Website;
+    use mongodb::bson::oid::ObjectId;
+
+    #[test]
+    fn test_find_changed_websites_multiple_changes() {
+        let random_date = "2024-01-01 00:00:00".to_string();
+        // Original websites
+        let original_websites = vec![
             Website {
-                id: 1,
-                last_checked_time: random_date.clone(),
-                status: 0,
-                url: "https://www.google.com".to_string(),
-            },
-            Website {
-                id: 2,
-                last_checked_time: random_date.clone(),
-                status: 20,
-                url: "https://this-is-a-fake-website-that-does-not-exist-123456789.com".to_string(),
-            },
-            Website {
-                id: 3,
-                last_checked_time: random_date.clone(),
-                status: 30,
-                url: "not-a-valid-url".to_string(),
-            },
-            Website {
-                id: 4,
-                last_checked_time: random_date.clone(),
+                id: Some(ObjectId::new()),
+                last_updated: random_date.clone(),
+                telegram_id: "1234567890".to_string(),
                 status: 200,
-                url: "http://10.255.255.1:80".to_string(), // Non-routable IP that will timeout
+                url: "https://example1.com".to_string(),
+            },
+            Website {
+                id: Some(ObjectId::new()),
+                last_updated: random_date.clone(),
+                telegram_id: "1234567890".to_string(),
+                status: 404,
+                url: "https://example2.com".to_string(),
+            },
+            Website {
+                id: Some(ObjectId::new()),
+                last_updated: random_date.clone(),
+                telegram_id: "1234567890".to_string(),
+                status: 500,
+                url: "https://example3.com".to_string(),
+            },
+            Website {
+                id: Some(ObjectId::new()),
+                last_updated: random_date.clone(),
+                telegram_id: "1234567890".to_string(),
+                status: 0,
+                url: "https://example4.com".to_string(),
+            },
+            Website {
+                id: Some(ObjectId::new()),
+                last_updated: random_date.clone(),
+                telegram_id: "1234567890".to_string(),
+                status: 200,
+                url: "https://example5.com".to_string(),
             },
         ];
 
-        let client = cust_client(5);
-        update_http_statuses(&mut websites, &client).await;
+        // New statuses derived from what would be updated websites
+        let new_statuses = vec![
+            200, // unchanged
+            200, // changed from 404
+            503, // changed from 500
+            200, // changed from 0
+            200, // unchanged
+        ];
 
-        // Check that all timestamps were updated
-        for website in &websites {
-            assert_ne!(website.last_checked_time, random_date);
+        let result = find_changed_websites(&original_websites, &new_statuses);
+
+        // Should only include websites with changed status
+        assert_eq!(result.len(), 3);
+
+        // Verify the correct websites were identified as changed
+        let changed_urls: Vec<String> = result.iter().map(|w| w.url.clone()).collect();
+        assert!(changed_urls.contains(&"https://example2.com".to_string())); // Website 2 changed from 404 to 200
+        assert!(changed_urls.contains(&"https://example3.com".to_string())); // Website 3 changed from 500 to 503
+        assert!(changed_urls.contains(&"https://example4.com".to_string())); // Website 4 changed from 0 to 200
+
+        // Verify unchanged websites are not included
+        assert!(!changed_urls.contains(&"https://example1.com".to_string())); // Website 1 unchanged
+        assert!(!changed_urls.contains(&"https://example5.com".to_string())); // Website 5 unchanged
+
+        // Verify that the changed websites have updated timestamps
+        for web in result {
+            assert_ne!(web.last_updated, random_date);
         }
+    }
 
-        // Check specific status codes
-        assert_eq!(websites[0].status, 200); // Google should be accessible
-        assert_eq!(websites[1].status, 0); // Fake website should fail
-        assert_eq!(websites[2].status, 0); // Invalid URL should fail
-        assert_eq!(websites[3].status, 0); // Timeout should fail
+    #[test]
+    fn test_find_changed_websites_no_changes() {
+        let original_websites = vec![Website {
+            id: Some(ObjectId::new()),
+            last_updated: "2024-01-01 00:00:00".to_string(),
+            telegram_id: "123".to_string(),
+            status: 200,
+            url: "https://example1.com".to_string(),
+        }];
+        let new_statuses = vec![200];
+        let changed = find_changed_websites(&original_websites, &new_statuses);
+        assert!(changed.is_empty());
     }
 }

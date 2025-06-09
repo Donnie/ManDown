@@ -15,6 +15,7 @@ on:
 
 env:
   GH_TOKEN: ${{ secrets.MANDOWN_PAT }}
+  TF_VAR_image: ${{ vars.IMAGE }}
 
 permissions:
   id-token: write
