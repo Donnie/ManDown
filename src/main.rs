@@ -1,24 +1,18 @@
-mod poll;
-
-mod handler;
-use handler::{handle_about, handle_list, handle_track, handle_untrack};
-
 mod alert;
 mod baseline;
 mod config;
+mod handler;
 mod http;
 mod mongo;
 mod parse_url;
+mod poll;
 
 use dotenvy::dotenv;
-
-use mongodb::Collection;
-use mongodb::bson::Document;
-use mongodb::{Client, options::ClientOptions};
+use handler::{handle_about, handle_list, handle_track, handle_untrack};
+use mongodb::{Client, Collection, bson::Document, options::ClientOptions};
+use poll::downtime_check;
 use std::sync::Arc;
 use teloxide::{prelude::*, utils::command::BotCommands};
-
-use crate::poll::downtime_check;
 
 #[derive(BotCommands, Clone)]
 #[command(
