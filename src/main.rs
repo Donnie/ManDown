@@ -70,7 +70,9 @@ async fn answer(
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
                 .await?;
         }
-        Command::Track(website) => handle_track(bot, msg, website.to_lowercase(), pool).await?,
+        Command::Track(website) => {
+            handle_track(bot, msg, website.to_lowercase(), &collection).await?
+        }
         Command::Untrack(website) => handle_untrack(bot, msg, website.to_lowercase(), pool).await?,
     };
     Ok(())

@@ -5,11 +5,11 @@ use crate::data::{
     list_users_by_website,
 };
 use crate::http::{HttpClient, cust_client};
-use crate::insert::put_user_website;
+use crate::mongo::put_site;
 use crate::parse_url::{extract_hostname, read_url};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
-use futures::StreamExt;
+use futures::{StreamExt, join};
 use mongodb::Collection;
 use mongodb::bson::{Document, doc};
 use teloxide::RequestError;
@@ -79,13 +79,30 @@ pub async fn handle_list(
     Ok(())
 }
 
+async fn check_and_track_url(
+    url: &str,
+    collection: &Collection<Document>,
+    telegram_id: i32,
+    client: &reqwest::Client,
+) -> ResponseResult<Option<String>> {
+    let status = client.get_status_code(url).await;
+    let message = process(url, status as i32);
+
+    if status == 200 {
+        put_site(collection, url, telegram_id)
+            .await
+            .unwrap_or_else(|_| panic!("Error inserting site {}", url));
+    }
+
+    Ok(Some(message))
+}
+
 pub async fn handle_track(
     bot: Bot,
     msg: Message,
     website: String,
-    pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
+    collection: &Collection<Document>,
 ) -> ResponseResult<()> {
-    let mut conn = pool.get().expect("Failed to get connection from pool");
     let telegram_id = msg.from().unwrap().id.0 as i32;
 
     let (valid, normal, ssl) = read_url(&website);
@@ -97,31 +114,20 @@ pub async fn handle_track(
     }
 
     let client = cust_client(30);
+    let normal_check = check_and_track_url(&normal, collection, telegram_id, &client);
+    let ssl_check = check_and_track_url(&ssl, collection, telegram_id, &client);
 
-    let status = client.get_status_code(&normal).await;
-    let message = process(&normal, status as i32);
+    let (normal_result, ssl_result) = join!(normal_check, ssl_check);
 
-    bot.send_message(msg.chat.id, message)
-        .parse_mode(ParseMode::Html)
-        .await?;
+    let messages: Vec<String> = [normal_result?, ssl_result?]
+        .into_iter()
+        .flatten()
+        .collect();
 
-    if status == 200 {
-        put_user_website(&mut conn, &normal, telegram_id)
-            .await
-            .unwrap_or_else(|_| panic!("Error inserting site {}", &normal));
-    }
-
-    let ssl_status = client.get_status_code(&ssl).await;
-
-    let message = process(&ssl, ssl_status as i32);
-    bot.send_message(msg.chat.id, message)
-        .parse_mode(ParseMode::Html)
-        .await?;
-
-    if ssl_status == 200 {
-        put_user_website(&mut conn, &ssl, telegram_id)
-            .await
-            .unwrap_or_else(|_| panic!("Error inserting site {}", &ssl));
+    if !messages.is_empty() {
+        bot.send_message(msg.chat.id, messages.join("\n\n"))
+            .parse_mode(ParseMode::Html)
+            .await?;
     }
 
     Ok(())
