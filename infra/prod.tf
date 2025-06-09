@@ -7,11 +7,30 @@ module "container" {
 
   container = {
     image = var.image
+
+    env = [
+      {
+        name  = "ENV"
+        value = "prod"
+      },
+      {
+        name  = "FREQ"
+        value = "600"
+      },
+      {
+        name  = "TELOXIDE_TOKEN"
+        value = var.teloxide_token
+      },
+      {
+        name  = "MONGODB_URI"
+        value = var.mongodb_uri
+      }
+    ]
   }
 }
 
 resource "google_compute_instance" "mandown" {
-  name         = "mandown"
+  name         = var.app_name
   machine_type = "e2-micro"
   zone         = var.zone
 
@@ -36,6 +55,10 @@ resource "google_compute_instance" "mandown" {
 
   network_interface {
     network = "default"
+
+    access_config {
+      # Include this section to give the VM an external IP address
+    }
   }
 
   service_account {
@@ -45,5 +68,5 @@ resource "google_compute_instance" "mandown" {
     ]
   }
 
-  tags = ["mandown"]
+  tags = [var.app_name]
 }
