@@ -10,6 +10,7 @@ mod config;
 mod data;
 mod http;
 mod insert;
+mod mongo;
 mod parse_url;
 mod schema;
 

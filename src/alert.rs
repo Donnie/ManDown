@@ -2,9 +2,10 @@ use diesel::SqliteConnection;
 use log::info;
 use teloxide::{prelude::*, types::ParseMode};
 
-use crate::{data::list_users_by_website, schema::Website};
+use crate::mongo::Website;
+use crate::{data::list_users_by_website, schema::Website as SQLWebsite};
 
-pub async fn notify_user(conn: &mut SqliteConnection, bot: Bot, changed_webs: Vec<Website>) {
+pub async fn notify_user(conn: &mut SqliteConnection, bot: Bot, changed_webs: Vec<SQLWebsite>) {
     for website in changed_webs {
         // Look up users for this website
         let users = list_users_by_website(conn, website.id)
@@ -24,6 +25,23 @@ pub async fn notify_user(conn: &mut SqliteConnection, bot: Bot, changed_webs: Ve
             {
                 info!("Failed to send message to {}: {}", chat_id, e);
             }
+        }
+    }
+}
+
+pub async fn alert_users(bot: Bot, changed_webs: &[Website]) {
+    for website in changed_webs {
+        let tele_id = website.telegram_id.parse::<i64>().unwrap();
+        let chat_id = ChatId(tele_id);
+
+        let message = process(&website.url, website.status);
+
+        if let Err(e) = bot
+            .send_message(chat_id, message)
+            .parse_mode(ParseMode::Html)
+            .await
+        {
+            info!("Failed to send message to {}: {}", chat_id, e);
         }
     }
 }

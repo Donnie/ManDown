@@ -1,4 +1,5 @@
-use crate::schema::Website;
+use crate::mongo::Website;
+use crate::schema::Website as SQLWebsite;
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use reqwest::Client;
@@ -36,7 +37,7 @@ pub fn cust_client(timeout: u64) -> Client {
 }
 
 // Function to update HTTP status of each website
-pub async fn update_http_statuses(webs: &mut [Website], client: &Client) {
+pub async fn update_http_statuses(webs: &mut [SQLWebsite], client: &Client) {
     // Create a vector to store all the futures
     let futures: Vec<_> = webs
         .iter_mut()
@@ -47,20 +48,52 @@ pub async fn update_http_statuses(webs: &mut [Website], client: &Client) {
     join_all(futures).await;
 }
 
-async fn update_http_status(web: &mut Website, client: &Client) {
+async fn update_http_status(web: &mut SQLWebsite, client: &Client) {
     let datetime: DateTime<Utc> = SystemTime::now().into();
     web.last_checked_time = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
     web.status = client.get_status_code(&web.url).await as i32;
 }
 
 // Function to update HTTP status with retry for failed checks
-async fn double_check_http_status(web: &mut Website, client: &Client) {
+async fn double_check_http_status(web: &mut SQLWebsite, client: &Client) {
     // First attempt
     update_http_status(web, client).await;
 
     // If status is 0, retry once
     if web.status == 0 {
         update_http_status(web, client).await;
+    }
+}
+
+pub fn find_changed_websites(original_webs: &[Website], new_statuses: &[u16]) -> Vec<Website> {
+    let datetime: DateTime<Utc> = SystemTime::now().into();
+    let timestamp = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+
+    original_webs
+        .iter()
+        .zip(new_statuses.iter())
+        .filter_map(|(web, &new_status)| {
+            if web.status != new_status as i32 {
+                let mut updated_web = web.clone();
+                updated_web.status = new_status as i32;
+                updated_web.last_updated = timestamp.clone();
+                Some(updated_web)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+// Function to get HTTP status of each website
+pub async fn get_status(client: &Client, url: &str) -> u16 {
+    let status = client.get_status_code(url).await;
+
+    // If status is 0, retry once
+    if status == 0 {
+        client.get_status_code(url).await
+    } else {
+        status
     }
 }
 
@@ -132,7 +165,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_http_status_real_website() {
-        let mut website = Website {
+        let mut website = SQLWebsite {
             id: 1,
             last_checked_time: "2020-01-01 00:00:00".to_string(),
             status: 0,
@@ -151,7 +184,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_http_status_fake_website() {
-        let mut website = Website {
+        let mut website = SQLWebsite {
             id: 2,
             last_checked_time: "2020-01-01 00:00:00".to_string(),
             status: 200,
@@ -170,7 +203,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_http_status_timeout() {
-        let mut website = Website {
+        let mut website = SQLWebsite {
             id: 3,
             last_checked_time: "2020-01-01 00:00:00".to_string(),
             status: 200,
@@ -189,7 +222,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_http_status_invalid_url() {
-        let mut website = Website {
+        let mut website = SQLWebsite {
             id: 4,
             last_checked_time: "2020-01-01 00:00:00".to_string(),
             status: 200,
@@ -210,25 +243,25 @@ mod tests {
     async fn test_update_http_statuses() {
         let random_date = "2020-01-01 00:00:00".to_string();
         let mut websites = vec![
-            Website {
+            SQLWebsite {
                 id: 1,
                 last_checked_time: random_date.clone(),
                 status: 0,
                 url: "https://www.google.com".to_string(),
             },
-            Website {
+            SQLWebsite {
                 id: 2,
                 last_checked_time: random_date.clone(),
                 status: 20,
                 url: "https://this-is-a-fake-website-that-does-not-exist-123456789.com".to_string(),
             },
-            Website {
+            SQLWebsite {
                 id: 3,
                 last_checked_time: random_date.clone(),
                 status: 30,
                 url: "not-a-valid-url".to_string(),
             },
-            Website {
+            SQLWebsite {
                 id: 4,
                 last_checked_time: random_date.clone(),
                 status: 200,
