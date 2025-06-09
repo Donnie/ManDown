@@ -7,3 +7,30 @@ resource "google_firestore_database" "firestore" {
   project                           = var.project_id
   type                              = "FIRESTORE_NATIVE"
 }
+
+resource "google_firestore_index" "url" {
+  project     = var.project_id
+  database    = google_firestore_database.firestore.name
+  api_scope   = "MONGODB_COMPATIBLE_API"
+  query_scope = "COLLECTION_GROUP"
+  density     = "SPARSE_ANY"
+  collection  = "websites"
+
+  fields {
+    field_path = "url"
+    order      = "ASCENDING"
+  }
+}
+resource "google_firestore_index" "telegram_id" {
+  project     = var.project_id
+  database    = google_firestore_database.firestore.name
+  api_scope   = "MONGODB_COMPATIBLE_API"
+  query_scope = "COLLECTION_GROUP"
+  density     = "SPARSE_ANY"
+  collection  = "websites"
+
+  fields {
+    field_path = "telegram_id"
+    order      = "ASCENDING"
+  }
+}
