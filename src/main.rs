@@ -15,7 +15,7 @@ mod schema;
 
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
-use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
+use diesel_migrations::{EmbeddedMigrations, embed_migrations};
 use dotenvy::dotenv;
 
 use mongodb::Collection;
@@ -52,7 +52,6 @@ async fn answer(
     bot: Bot,
     msg: Message,
     cmd: Command,
-    pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
     collection: Arc<Collection<Document>>,
 ) -> ResponseResult<()> {
     match cmd {
@@ -73,7 +72,9 @@ async fn answer(
         Command::Track(website) => {
             handle_track(bot, msg, website.to_lowercase(), &collection).await?
         }
-        Command::Untrack(website) => handle_untrack(bot, msg, website.to_lowercase(), pool).await?,
+        Command::Untrack(website) => {
+            handle_untrack(bot, msg, website.to_lowercase(), &collection).await?
+        }
     };
     Ok(())
 }
@@ -96,8 +97,6 @@ async fn main() {
     // Load environment variables from a `.env` file if it exists
     dotenv().ok();
 
-    let pool = establish_connection();
-
     // Initialize MongoDB client
     let uri = dotenvy::var("MONGODB_URI").expect("MONGODB_URI must be set");
     let client_options = ClientOptions::parse(uri)
@@ -106,11 +105,6 @@ async fn main() {
     let client = Client::with_options(client_options).expect("Failed to create MongoDB client");
     let db = client.database("mandown");
     let collection = Arc::new(db.collection::<Document>("websites"));
-
-    // Run migrations using a connection from the pool
-    let mut conn = pool.get().expect("Failed to get connection from pool");
-    conn.run_pending_migrations(MIGRATIONS)
-        .expect("Failed to apply database migrations");
 
     // Get the polling frequency from the environment variable or use a default value
     let interval: u64 = dotenvy::var("FREQ")
@@ -129,11 +123,9 @@ async fn main() {
     });
 
     // Start the bot's command loop
-    let pool = pool.clone();
     Command::repl(bot, move |bot, msg, cmd| {
-        let pool = pool.clone();
         let collection = collection.clone();
-        async move { answer(bot, msg, cmd, pool, collection).await }
+        async move { answer(bot, msg, cmd, collection).await }
     })
     .await;
 }

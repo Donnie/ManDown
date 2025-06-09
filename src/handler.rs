@@ -1,14 +1,7 @@
 use crate::alert::process;
-use crate::data::list_websites_by_user;
-use crate::data::{
-    delete_user, delete_user_website, delete_website, get_user_by_telegram_id, get_websites_by_url,
-    list_users_by_website,
-};
 use crate::http::{HttpClient, cust_client};
-use crate::mongo::put_site;
+use crate::mongo::{delete_sites_by_hostname, put_site};
 use crate::parse_url::{extract_hostname, read_url};
-use diesel::r2d2::{self, ConnectionManager};
-use diesel::sqlite::SqliteConnection;
 use futures::{StreamExt, join};
 use mongodb::Collection;
 use mongodb::bson::{Document, doc};
@@ -137,60 +130,31 @@ pub async fn handle_untrack(
     bot: Bot,
     msg: Message,
     website: String,
-    pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
+    collection: &Collection<Document>,
 ) -> ResponseResult<()> {
-    let mut conn = pool.get().expect("Failed to get connection from pool");
     let telegram_id = msg.from().unwrap().id.0 as i32;
-    let website = extract_hostname(&website);
+    let hostname = extract_hostname(&website);
+    if hostname.len() < 3 {
+        bot.send_message(msg.chat.id, "Invalid URL!".to_string())
+            .parse_mode(ParseMode::Html)
+            .await?;
+        return Ok(());
+    }
 
-    // get owner by telegram_id
-    let user = get_user_by_telegram_id(&mut conn, telegram_id)
-        .await
-        .expect("Error getting user");
+    let result = delete_sites_by_hostname(collection, &hostname, telegram_id).await;
 
-    // get sites matching url
-    let sites = get_websites_by_url(&mut conn, &website)
-        .await
-        .expect("Error getting website");
-
-    for site in sites {
-        delete_user_website(&mut conn, site.id, user.id)
-            .await
-            .expect("Error deleting user website");
-
-        // get list of owners from url
-        let owners = list_users_by_website(&mut conn, site.id)
-            .await
-            .expect("Error listing owners");
-
-        // if no owners then delete the website from the database
-        let owners_count = owners.len();
-        if owners_count == 0 {
-            delete_website(&mut conn, site.id)
-                .await
-                .expect("Error deleting website");
+    let message = match result {
+        Ok(0) => format!("No sites found for {}", hostname),
+        Ok(count) => format!("Successfully untracked {} site(s) for {}", count, hostname),
+        Err(e) => {
+            log::error!("Error untracking {}: {}", hostname, e);
+            format!("An error occurred while untracking {}", hostname)
         }
-    }
+    };
 
-    // get list of websites from telegram_id
-    let sites = list_websites_by_user(&mut conn, telegram_id)
-        .await
-        .expect("Error listing websites");
-
-    // if no sites then delete the owner from the database
-    let sites_count = sites.len();
-    if sites_count == 0 {
-        delete_user(&mut conn, user.id)
-            .await
-            .expect("Error deleting user");
-    }
-
-    bot.send_message(
-        msg.chat.id,
-        format!("Website {} untracked successfully!", website),
-    )
-    .parse_mode(ParseMode::Html)
-    .await?;
+    bot.send_message(msg.chat.id, message)
+        .parse_mode(ParseMode::Html)
+        .await?;
 
     Ok(())
 }
