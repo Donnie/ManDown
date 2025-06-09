@@ -6,16 +6,10 @@ use handler::{handle_about, handle_list, handle_track, handle_untrack};
 mod alert;
 mod baseline;
 mod config;
-mod data;
 mod http;
-mod insert;
 mod mongo;
 mod parse_url;
-mod schema;
 
-use diesel::r2d2::{self, ConnectionManager};
-use diesel::sqlite::SqliteConnection;
-use diesel_migrations::{EmbeddedMigrations, embed_migrations};
 use dotenvy::dotenv;
 
 use mongodb::Collection;
@@ -78,18 +72,6 @@ async fn answer(
     };
     Ok(())
 }
-
-pub fn establish_connection() -> r2d2::Pool<ConnectionManager<SqliteConnection>> {
-    dotenv().ok();
-
-    let database_url = dotenvy::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let manager = ConnectionManager::<SqliteConnection>::new(database_url);
-    r2d2::Pool::builder()
-        .build(manager)
-        .expect("Failed to create pool")
-}
-
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
 // Use the Tokio runtime for asynchronous execution
 #[tokio::main]
