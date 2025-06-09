@@ -93,23 +93,8 @@ jobs:
         run: |-
           gcloud compute instances update-container mandown \
             --zone ${{ vars.GCP_ZONE }} \
-            --container-image ${{ vars.IMAGE }}
-
-      - name: Pull image into production
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.GCP_HOST }}
-          username: ${{ secrets.GCP_USER }}
-          key: ${{ secrets.GCP_SECRET }}
-          script: |
-            sudo docker pull ${{ vars.IMAGE }}
-            sudo docker stop mandown || true
-            sudo docker rm mandown || true
-            export TELOXIDE_TOKEN='${{ secrets.TELOXIDE_TOKEN }}'
-            export MONGODB_URI='${{ secrets.MONGODB_URI }}'
-            sudo docker run -d --restart on-failure \
-              -e ENV=prod \
-              -e FREQ=600 \
-              -e TELOXIDE_TOKEN=$TELOXIDE_TOKEN \
-              -e MONGODB_URI=$MONGODB_URI \
-              --name mandown ${{ vars.IMAGE }}
+            --container-image ${{ env.image_name }} \
+            --container-env "ENV=prod" \
+            --container-env "FREQ=${{ vars.FREQ }}" \
+            --container-env "TELOXIDE_TOKEN=${{ secrets.TELOXIDE_TOKEN }}" \
+            --container-env "MONGODB_URI=${{ secrets.MONGODB_URI }}"

@@ -16,7 +16,10 @@ on:
 env:
   GH_TOKEN: ${{ secrets.MANDOWN_PAT }}
   TF_VAR_image: ${{ vars.IMAGE }}
+  TF_VAR_freq: ${{ vars.FREQ }}
   TF_VAR_zone: ${{ vars.GCP_ZONE }}
+  TF_VAR_teloxide_token: ${{ secrets.TELOXIDE_TOKEN }}
+  TF_VAR_mongodb_uri: ${{ secrets.MONGODB_URI }}
 
 permissions:
   id-token: write
