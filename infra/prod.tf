@@ -1,3 +1,6 @@
+data "google_project" "project" {
+}
+
 module "container" {
   source  = "terraform-google-modules/container-vm/google"
   version = "~> 2.0" # Upgrade the version if necessary.
