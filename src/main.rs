@@ -18,6 +18,7 @@ use diesel::sqlite::SqliteConnection;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use dotenvy::dotenv;
 
+use mongodb::Collection;
 use mongodb::bson::Document;
 use mongodb::{Client, options::ClientOptions};
 use std::sync::Arc;
@@ -52,6 +53,7 @@ async fn answer(
     msg: Message,
     cmd: Command,
     pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
+    collection: Arc<Collection<Document>>,
 ) -> ResponseResult<()> {
     match cmd {
         Command::About => handle_about(bot, msg).await?,
@@ -63,7 +65,7 @@ async fn answer(
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
                 .await?;
         }
-        Command::List => handle_list(bot, msg, pool).await?,
+        Command::List => handle_list(bot, msg, &collection).await?,
         Command::Start => {
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
                 .await?;
@@ -128,7 +130,8 @@ async fn main() {
     let pool = pool.clone();
     Command::repl(bot, move |bot, msg, cmd| {
         let pool = pool.clone();
-        async move { answer(bot, msg, cmd, pool).await }
+        let collection = collection.clone();
+        async move { answer(bot, msg, cmd, pool, collection).await }
     })
     .await;
 }

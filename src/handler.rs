@@ -9,6 +9,10 @@ use crate::insert::put_user_website;
 use crate::parse_url::{extract_hostname, read_url};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
+use futures::StreamExt;
+use mongodb::Collection;
+use mongodb::bson::{Document, doc};
+use teloxide::RequestError;
 use teloxide::{prelude::*, types::ParseMode};
 
 pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
@@ -27,21 +31,46 @@ pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
 pub async fn handle_list(
     bot: Bot,
     msg: Message,
-    pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
+    collection: &Collection<Document>,
 ) -> ResponseResult<()> {
-    let mut conn = pool.get().expect("Failed to get connection from pool");
     let telegram_id = msg.from().unwrap().id.0 as i32;
-    let webs = list_websites_by_user(&mut conn, telegram_id)
-        .await
-        .expect("Error listing Websites");
 
-    let websites = webs
-        .iter()
-        .map(|record| record.url.as_str())
-        .collect::<Vec<&str>>()
-        .join("\n");
+    // Create a filter to match documents with the user's telegram_id
+    let filter = doc! { "telegram_id": format!("{}", telegram_id) };
 
-    let output = format!("Here are your tracked domains:\n\n<pre>{}</pre>", websites);
+    // Find documents matching the filter
+    let mut cursor = collection.find(filter).await.map_err(|e| {
+        log::error!("Failed to query MongoDB: {}", e);
+        RequestError::from(std::io::Error::new(std::io::ErrorKind::Other, e))
+    })?;
+
+    // Collect all website URLs into a vector
+    let mut websites: Vec<String> = Vec::new();
+    while let Some(doc) = cursor.next().await {
+        match doc {
+            Ok(doc) => {
+                if let Ok(url) = doc.get_str("url") {
+                    websites.push(url.to_string());
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to read document: {}", e);
+                return Err(RequestError::from(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e,
+                )));
+            }
+        }
+    }
+
+    websites.sort();
+
+    // Create a formatted list of websites
+    let websites_list = websites.join("\n");
+    let output = format!(
+        "Here are your tracked domains:\n\n<pre>{}</pre>",
+        websites_list
+    );
 
     bot.send_message(msg.chat.id, output)
         .parse_mode(ParseMode::Html)
