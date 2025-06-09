@@ -1,15 +1,5 @@
 use crate::schema::{User, Website};
-use diesel::{dsl::*, prelude::*, sqlite::SqliteConnection};
-
-pub fn get_all_websites(
-    conn: &mut SqliteConnection,
-) -> Result<Vec<Website>, diesel::result::Error> {
-    use crate::schema::websites::dsl::*;
-    // Fetch all the Websites from the websites table
-    let webs: Vec<Website> = websites.load(conn)?;
-
-    Ok(webs)
-}
+use diesel::{prelude::*, sqlite::SqliteConnection};
 
 pub async fn list_websites_by_user(
     conn: &mut SqliteConnection,
@@ -80,37 +70,4 @@ pub async fn list_users_by_website(
         .load(conn)?;
 
     Ok(uss)
-}
-
-pub fn write_all_websites(
-    conn: &mut SqliteConnection,
-    webs: Vec<Website>,
-) -> Result<Vec<Website>, diesel::result::Error> {
-    let ids: Vec<i32> = webs.iter().map(|web| web.id).collect();
-
-    // Building the SQL update statement
-    let mut sql = "UPDATE websites SET".to_string();
-
-    sql += " last_checked_time = CASE id";
-    for web in &webs {
-        sql += &format!(" WHEN {} THEN '{}'", web.id, web.last_checked_time);
-    }
-    sql += " END,";
-
-    sql += " status = CASE id";
-    for web in &webs {
-        sql += &format!(" WHEN {} THEN {}", web.id, web.status);
-    }
-    sql += " END WHERE id IN (";
-    sql += &ids
-        .iter()
-        .map(|id| id.to_string())
-        .collect::<Vec<String>>()
-        .join(",");
-    sql += ")";
-
-    // Executing the SQL update statement
-    sql_query(sql).execute(conn)?;
-
-    Ok(webs)
 }
