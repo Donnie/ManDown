@@ -1,5 +1,5 @@
 FROM rust:alpine as builder
-RUN apk update && apk add --no-cache pkgconfig musl-dev openssl-dev sqlite-dev
+RUN apk update && apk add --no-cache pkgconfig musl-dev openssl-dev
 
 # Set necessary environmet variables needed for our image
 ENV RUSTFLAGS='-C target-feature=-crt-static'
@@ -21,7 +21,6 @@ RUN adduser \
 
 # Copy the code into the container
 COPY src/ src/
-COPY migrations/ migrations/
 COPY config.yaml ./
 COPY Cargo.* ./
 
@@ -42,14 +41,13 @@ RUN cargo build --release
 ############################
 FROM alpine
 
-RUN apk update && apk add --no-cache libgcc openssl sqlite sqlite-libs
+RUN apk update && apk add --no-cache libgcc openssl
 
 COPY --from=builder /build/target/release/man_down /mandown
 
 # Import the user and group files from the builder
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
-COPY migrations/ migrations/
 COPY config.yaml ./
 
 # Use the unprivileged user
