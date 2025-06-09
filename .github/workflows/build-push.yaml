@@ -95,6 +95,6 @@ jobs:
             --zone ${{ vars.GCP_ZONE }} \
             --container-image ${{ env.image_name }} \
             --container-env "ENV=prod" \
-            --container-env "FREQ=600" \
+            --container-env "FREQ=${{ vars.FREQ }}" \
             --container-env "TELOXIDE_TOKEN=${{ secrets.TELOXIDE_TOKEN }}" \
             --container-env "MONGODB_URI=${{ secrets.MONGODB_URI }}"

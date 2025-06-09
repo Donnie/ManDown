@@ -19,6 +19,12 @@ variable "zone" {
 }
 
 ## Compute Engine
+variable "freq" {
+  description = "Frequency in seconds"
+  type        = string
+  default     = "600"
+}
+
 variable "image" {
   description = "Docker image"
   type        = string

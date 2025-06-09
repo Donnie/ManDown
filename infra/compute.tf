@@ -15,7 +15,7 @@ module "container" {
       },
       {
         name  = "FREQ"
-        value = "600"
+        value = var.freq
       },
       {
         name  = "TELOXIDE_TOKEN"
