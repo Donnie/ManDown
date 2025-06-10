@@ -84,7 +84,7 @@ async fn main() {
     let client = Client::with_options(client_options).expect("Failed to create MongoDB client");
     let db = client.database("mandown");
     let collection = Arc::new(db.collection::<Document>("websites"));
-    let http_client = Arc::new(cust_client(30));
+    let http_client = cust_client(30);
 
     // Get the polling frequency from the environment variable or use a default value
     let interval: u64 = dotenvy::var("FREQ")

@@ -1,7 +1,7 @@
 use crate::mongo::Website;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
-use std::time::SystemTime;
+use std::{sync::Arc, time::SystemTime};
 
 // Trait for HTTP clients to enable testing
 #[async_trait::async_trait]
@@ -27,11 +27,12 @@ impl HttpClient for reqwest::Client {
 }
 
 // Function to create a client with preset timeout
-pub fn cust_client(timeout: u64) -> Client {
-    Client::builder()
+pub fn cust_client(timeout: u64) -> Arc<Client> {
+    Arc::new(Client::builder()
         .timeout(std::time::Duration::from_secs(timeout))
         .build()
         .expect("Failed to build HTTP client")
+    )
 }
 
 // Function to update HTTP status of each website

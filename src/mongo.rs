@@ -85,11 +85,17 @@ pub async fn delete_sites_by_hostname(
     Ok(result.deleted_count)
 }
 
-pub async fn get_all_sites(
+pub async fn get_sites(
     collection: &Collection<Document>,
+    skip: u64,
+    limit: i64,
 ) -> Result<Vec<Website>, mongodb::error::Error> {
     let mut websites = Vec::new();
-    let mut cursor = collection.find(doc! {}).await?;
+    let find_options = mongodb::options::FindOptions::builder()
+        .skip(skip)
+        .limit(limit)
+        .build();
+    let mut cursor = collection.find(doc! {}).with_options(find_options).await?;
 
     while cursor.advance().await? {
         let doc = cursor.deserialize_current()?;
