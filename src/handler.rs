@@ -1,7 +1,7 @@
 use crate::alert::process;
 use crate::format::format_website_list;
 use crate::http::HttpClient;
-use crate::mongo::{delete_sites_by_hostname, get_user_websites, put_site};
+use crate::mongo::{clear_user_websites, delete_sites_by_hostname, get_user_websites, put_site};
 use crate::parse_url::{extract_hostname, read_url};
 use futures::join;
 use mongodb::Collection;
@@ -16,6 +16,28 @@ pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
   No personally identifiable information is stored or used by this bot.";
 
     bot.send_message(msg.chat.id, output)
+        .parse_mode(ParseMode::Html)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn handle_clear(
+    bot: Bot,
+    msg: Message,
+    collection: &Collection<Document>,
+) -> ResponseResult<()> {
+    let telegram_id = msg.from().unwrap().id.0 as i32;
+
+    let message = match clear_user_websites(collection, telegram_id).await {
+        Ok(count) => format!("Successfully cleared {} site(s)", count),
+        Err(e) => {
+            log::error!("Failed to clear user websites: {}", e);
+            format!("Failed to clear user websites: {}", e)
+        }
+    };
+
+    bot.send_message(msg.chat.id, message)
         .parse_mode(ParseMode::Html)
         .await?;
 

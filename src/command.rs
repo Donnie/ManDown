@@ -1,4 +1,4 @@
-use crate::handler::{handle_about, handle_list, handle_track, handle_untrack};
+use crate::handler::{handle_about, handle_clear, handle_list, handle_track, handle_untrack};
 use mongodb::{Collection, bson::Document};
 use std::sync::Arc;
 use teloxide::prelude::*;
@@ -50,10 +50,7 @@ async fn answer(
 ) -> ResponseResult<()> {
     match cmd {
         Command::About => handle_about(bot, msg).await?,
-        Command::Clear => {
-            bot.send_message(msg.chat.id, Command::descriptions().to_string())
-                .await?;
-        }
+        Command::Clear => handle_clear(bot, msg, &collection).await?,
         Command::Help => {
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
                 .await?;
