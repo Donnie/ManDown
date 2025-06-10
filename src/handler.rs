@@ -75,17 +75,18 @@ async fn check_and_track_url(
     collection: &Collection<Document>,
     telegram_id: i32,
     client: &reqwest::Client,
-) -> ResponseResult<Option<String>> {
+) -> String {
     let status = client.get_status_code(url).await;
-    let message = process(url, status as i32);
+    let mut message = process(url, status as i32);
 
     if status == 200 {
-        put_site(collection, url, telegram_id)
-            .await
-            .unwrap_or_else(|_| panic!("Error inserting site {}", url));
+        if let Err(e) = put_site(collection, url, telegram_id).await {
+            log::error!("Failed to insert site {}: {}", url, e);
+            message = format!("Failed to track <code>{}</code>", url);
+        }
     }
 
-    Ok(Some(message))
+    message
 }
 
 pub async fn handle_track(
@@ -110,10 +111,7 @@ pub async fn handle_track(
 
     let (normal_result, ssl_result) = join!(normal_check, ssl_check);
 
-    let messages: Vec<String> = [normal_result?, ssl_result?]
-        .into_iter()
-        .flatten()
-        .collect();
+    let messages = vec![normal_result, ssl_result];
 
     if !messages.is_empty() {
         bot.send_message(msg.chat.id, messages.join("\n\n"))
