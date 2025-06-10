@@ -42,6 +42,7 @@ pub async fn get_status(client: &Client, url: &str) -> u16 {
 
     // If status is 0, retry once
     if status == 0 {
+        log::info!("Retrying {} because status is 0", url);
         client.get_status_code(url).await
     } else {
         status

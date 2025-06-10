@@ -10,6 +10,7 @@ mod parse_url;
 mod poll;
 
 use command::start_command;
+use config::init_logger;
 use dotenvy::dotenv;
 use http::cust_client;
 use mongo::init_mongo;
@@ -21,10 +22,13 @@ use teloxide::prelude::*;
 async fn main() {
     // Load environment variables from a `.env` file if it exists
     dotenv().ok();
+    init_logger();
 
     let collection = init_mongo().await;
     let http_client = cust_client(30);
     let bot = Bot::from_env();
+
+    log::info!("Bot started");
 
     start_downtime_checker(bot.clone(), collection.clone(), http_client.clone());
 

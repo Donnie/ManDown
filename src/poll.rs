@@ -2,13 +2,10 @@ use crate::alert::alert_users;
 use crate::baseline::baseline_available;
 use crate::http::{find_changed_websites, get_status};
 use crate::mongo::{Website, get_sites, update_db};
-use chrono::{DateTime, Utc};
 use futures::future::join_all;
-use log::{error, info};
 use mongodb::Collection;
 use mongodb::bson::Document;
 use std::sync::Arc;
-use std::time::SystemTime;
 use teloxide::Bot;
 use tokio::time;
 
@@ -34,7 +31,9 @@ async fn downtime_check(
     client: Arc<reqwest::Client>,
 ) {
     loop {
+        log::info!("Starting downtime check");
         let changed_websites = get_changed_sites(collection, client.clone()).await;
+        log::info!("Found {} changed websites", changed_websites.len());
         handle_changed_websites(collection, bot.clone(), &changed_websites).await;
         time::sleep(time::Duration::from_secs(interval)).await;
     }
@@ -44,10 +43,8 @@ async fn get_changed_sites(
     collection: &Collection<Document>,
     client: Arc<reqwest::Client>,
 ) -> Vec<Website> {
-    println!("Checking Websites now");
-
     if !baseline_available(client.clone()).await {
-        println!("Baseline not available, skipping check.");
+        log::info!("Baseline not available, skipping check.");
         return Vec::new();
     }
 
@@ -56,38 +53,25 @@ async fn get_changed_sites(
     const LIMIT: i64 = 20;
 
     loop {
-        println!(
-            "{}: Getting websites from DB, skip: {}",
-            DateTime::<Utc>::from(SystemTime::now()).format("%Y-%m-%d %H:%M:%S"),
-            skip
-        );
         let websites = match get_sites(collection, skip, LIMIT).await {
             Ok(sites) => sites,
             Err(e) => {
-                error!("Error getting websites from DB: {}", e);
+                log::error!("Error getting websites from DB: {}", e);
                 return Vec::new();
             }
         };
-        println!(
-            "{}: Got {} websites from DB",
-            DateTime::<Utc>::from(SystemTime::now()).format("%Y-%m-%d %H:%M:%S"),
-            websites.len()
-        );
 
         if websites.is_empty() {
             break;
         }
+
+        log::info!("Getting statuses for {} websites", websites.len());
 
         let new_statuses = fetch_website_statuses(&websites, client.clone()).await;
         let changed_in_batch = find_changed_websites(&websites, &new_statuses);
         all_changed_websites.extend(changed_in_batch);
 
         skip += LIMIT as u64;
-        println!(
-            "{}: Skipping {} websites",
-            DateTime::<Utc>::from(SystemTime::now()).format("%Y-%m-%d %H:%M:%S"),
-            skip
-        );
     }
 
     all_changed_websites
@@ -104,7 +88,6 @@ async fn handle_changed_websites(
     changed_websites: &[Website],
 ) {
     let web_count = changed_websites.len();
-    info!("{} websites changed", web_count);
 
     if web_count == 0 {
         return;
@@ -113,6 +96,6 @@ async fn handle_changed_websites(
     alert_users(bot, changed_websites).await;
 
     if let Err(e) = update_db(collection, changed_websites).await {
-        error!("Error updating websites in DB: {}", e);
+        log::error!("Error updating websites in DB: {}", e);
     }
 }
