@@ -1,6 +1,7 @@
 mod alert;
 mod baseline;
 mod config;
+mod format;
 mod handler;
 mod http;
 mod mongo;

@@ -1,13 +1,13 @@
 use crate::alert::process;
+use crate::format::format_website_list;
 use crate::http::HttpClient;
-use crate::mongo::{delete_sites_by_hostname, put_site};
+use crate::mongo::{delete_sites_by_hostname, get_user_websites, put_site};
 use crate::parse_url::{extract_hostname, read_url};
-use futures::{StreamExt, join};
+use futures::join;
 use mongodb::Collection;
-use mongodb::bson::{Document, doc};
-use teloxide::RequestError;
-use teloxide::{prelude::*, types::ParseMode};
+use mongodb::bson::Document;
 use std::sync::Arc;
+use teloxide::{prelude::*, types::ParseMode};
 
 pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
     let output = "<b>ManDown</b>:
@@ -29,41 +29,15 @@ pub async fn handle_list(
 ) -> ResponseResult<()> {
     let telegram_id = msg.from().unwrap().id.0 as i32;
 
-    // Create a filter to match documents with the user's telegram_id
-    let filter = doc! { "telegram_id": format!("{}", telegram_id) };
-
-    // Find documents matching the filter
-    let mut cursor = collection.find(filter).await.map_err(|e| {
-        log::error!("Failed to query MongoDB: {}", e);
-        RequestError::from(std::io::Error::other(e))
-    })?;
-
-    // Collect all website URLs into a vector
-    let mut websites: Vec<String> = Vec::new();
-    while let Some(doc) = cursor.next().await {
-        match doc {
-            Ok(doc) => {
-                if let Ok(url) = doc.get_str("url") {
-                    websites.push(url.to_string());
-                }
-            }
-            Err(e) => {
-                log::error!("Failed to read document: {}", e);
-                return Err(RequestError::from(std::io::Error::other(e)));
-            }
+    let message = match get_user_websites(collection, telegram_id).await {
+        Ok(websites) => format_website_list(&websites),
+        Err(e) => {
+            log::error!("Failed to get user websites: {}", e);
+            "Failed to get user websites".to_string()
         }
-    }
+    };
 
-    websites.sort();
-
-    // Create a formatted list of websites
-    let websites_list = websites.join("\n");
-    let output = format!(
-        "Here are your tracked domains:\n\n<pre>{}</pre>",
-        websites_list
-    );
-
-    bot.send_message(msg.chat.id, output)
+    bot.send_message(msg.chat.id, message)
         .parse_mode(ParseMode::Html)
         .await?;
 

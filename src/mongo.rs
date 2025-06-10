@@ -1,4 +1,5 @@
 use chrono::Utc;
+use futures::StreamExt;
 use mongodb::{
     Collection,
     bson::{Document, doc},
@@ -121,4 +122,34 @@ pub async fn update_db(
     }
 
     Ok(())
+}
+
+pub async fn get_user_websites(
+    collection: &Collection<Document>,
+    telegram_id: i32,
+) -> Result<Vec<Website>, mongodb::error::Error> {
+    let filter = doc! { "telegram_id": format!("{}", telegram_id) };
+
+    let mut cursor = collection.find(filter).await.map_err(|e| {
+        log::error!("Failed to query MongoDB: {}", e);
+        mongodb::error::Error::from(std::io::Error::other(e))
+    })?;
+
+    let mut websites: Vec<Website> = Vec::new();
+    while let Some(doc_result) = cursor.next().await {
+        match doc_result {
+            Ok(doc) => {
+                if let Ok(website) = mongodb::bson::from_document::<Website>(doc) {
+                    websites.push(website);
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to read document: {}", e);
+                return Err(mongodb::error::Error::from(std::io::Error::other(e)));
+            }
+        }
+    }
+
+    websites.sort_by(|a, b| a.url.cmp(&b.url));
+    Ok(websites)
 }
