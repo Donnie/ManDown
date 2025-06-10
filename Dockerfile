@@ -26,8 +26,12 @@ COPY Cargo.* ./
 # This is a workaround to avoid rebuilding the dependencies on every change.
 RUN mkdir src && \
     echo 'fn main() {}' > src/main.rs && \
-    cargo build --release && \
-    rm -rf src target/release/man_down target/release/.fingerprint/man_down*
+    cargo build --release
+
+RUN cargo fmt --all -- --check
+RUN cargo clippy --all-targets --all-features -- -D warnings
+RUN cargo test
+RUN rm -rf src target/release/man_down target/release/.fingerprint/man_down* target/debug/deps/man_down*
 
 COPY src/ src/
 COPY config.yaml ./
