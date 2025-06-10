@@ -1,11 +1,12 @@
 use crate::alert::process;
-use crate::http::{HttpClient, cust_client};
-use crate::mongo::{delete_sites_by_hostname, put_site};
+use crate::format::format_website_list;
+use crate::http::HttpClient;
+use crate::mongo::{delete_sites_by_hostname, get_user_websites, put_site};
 use crate::parse_url::{extract_hostname, read_url};
-use futures::{StreamExt, join};
+use futures::join;
 use mongodb::Collection;
-use mongodb::bson::{Document, doc};
-use teloxide::RequestError;
+use mongodb::bson::Document;
+use std::sync::Arc;
 use teloxide::{prelude::*, types::ParseMode};
 
 pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
@@ -28,41 +29,15 @@ pub async fn handle_list(
 ) -> ResponseResult<()> {
     let telegram_id = msg.from().unwrap().id.0 as i32;
 
-    // Create a filter to match documents with the user's telegram_id
-    let filter = doc! { "telegram_id": format!("{}", telegram_id) };
-
-    // Find documents matching the filter
-    let mut cursor = collection.find(filter).await.map_err(|e| {
-        log::error!("Failed to query MongoDB: {}", e);
-        RequestError::from(std::io::Error::other(e))
-    })?;
-
-    // Collect all website URLs into a vector
-    let mut websites: Vec<String> = Vec::new();
-    while let Some(doc) = cursor.next().await {
-        match doc {
-            Ok(doc) => {
-                if let Ok(url) = doc.get_str("url") {
-                    websites.push(url.to_string());
-                }
-            }
-            Err(e) => {
-                log::error!("Failed to read document: {}", e);
-                return Err(RequestError::from(std::io::Error::other(e)));
-            }
+    let message = match get_user_websites(collection, telegram_id).await {
+        Ok(websites) => format_website_list(&websites),
+        Err(e) => {
+            log::error!("Failed to get user websites: {}", e);
+            "Failed to get user websites".to_string()
         }
-    }
+    };
 
-    websites.sort();
-
-    // Create a formatted list of websites
-    let websites_list = websites.join("\n");
-    let output = format!(
-        "Here are your tracked domains:\n\n<pre>{}</pre>",
-        websites_list
-    );
-
-    bot.send_message(msg.chat.id, output)
+    bot.send_message(msg.chat.id, message)
         .parse_mode(ParseMode::Html)
         .await?;
 
@@ -74,17 +49,18 @@ async fn check_and_track_url(
     collection: &Collection<Document>,
     telegram_id: i32,
     client: &reqwest::Client,
-) -> ResponseResult<Option<String>> {
+) -> String {
     let status = client.get_status_code(url).await;
-    let message = process(url, status as i32);
+    let mut message = process(url, status as i32);
 
     if status == 200 {
-        put_site(collection, url, telegram_id)
-            .await
-            .unwrap_or_else(|_| panic!("Error inserting site {}", url));
+        if let Err(e) = put_site(collection, url, telegram_id).await {
+            log::error!("Failed to insert site {}: {}", url, e);
+            message = format!("Failed to track <code>{}</code>", url);
+        }
     }
 
-    Ok(Some(message))
+    message
 }
 
 pub async fn handle_track(
@@ -92,6 +68,7 @@ pub async fn handle_track(
     msg: Message,
     website: String,
     collection: &Collection<Document>,
+    client: Arc<reqwest::Client>,
 ) -> ResponseResult<()> {
     let telegram_id = msg.from().unwrap().id.0 as i32;
 
@@ -103,16 +80,12 @@ pub async fn handle_track(
         return Ok(());
     }
 
-    let client = cust_client(30);
     let normal_check = check_and_track_url(&normal, collection, telegram_id, &client);
     let ssl_check = check_and_track_url(&ssl, collection, telegram_id, &client);
 
     let (normal_result, ssl_result) = join!(normal_check, ssl_check);
 
-    let messages: Vec<String> = [normal_result?, ssl_result?]
-        .into_iter()
-        .flatten()
-        .collect();
+    let messages = [normal_result, ssl_result];
 
     if !messages.is_empty() {
         bot.send_message(msg.chat.id, messages.join("\n\n"))

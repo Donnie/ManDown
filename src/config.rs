@@ -1,6 +1,22 @@
 use serde::Deserialize;
 use std::env;
 use std::fs;
+use std::io::Write;
+
+pub fn init_logger() {
+    env_logger::Builder::new()
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "{} [{}] - {}",
+                chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                record.level(),
+                record.args()
+            )
+        })
+        .filter(None, log::LevelFilter::Trace)
+        .init();
+}
 
 #[derive(Debug, Deserialize)]
 pub struct Config {

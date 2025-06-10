@@ -1,9 +1,12 @@
 use chrono::Utc;
+use futures::StreamExt;
 use mongodb::{
-    Collection,
+    Client, Collection,
     bson::{Document, doc},
+    options::ClientOptions,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Website {
@@ -13,6 +16,16 @@ pub struct Website {
     pub last_updated: String,
     pub status: i32,
     pub telegram_id: String,
+}
+
+pub async fn init_mongo() -> Arc<Collection<Document>> {
+    let uri = dotenvy::var("MONGODB_URI").expect("MONGODB_URI must be set");
+    let client_options = ClientOptions::parse(&uri)
+        .await
+        .expect("Failed to parse MongoDB URI");
+    let client = Client::with_options(client_options).expect("Failed to create MongoDB client");
+    let db = client.database("mandown");
+    Arc::new(db.collection::<Document>("websites"))
 }
 
 pub async fn put_site(
@@ -84,11 +97,17 @@ pub async fn delete_sites_by_hostname(
     Ok(result.deleted_count)
 }
 
-pub async fn get_all_sites(
+pub async fn get_sites(
     collection: &Collection<Document>,
+    skip: u64,
+    limit: i64,
 ) -> Result<Vec<Website>, mongodb::error::Error> {
     let mut websites = Vec::new();
-    let mut cursor = collection.find(doc! {}).await?;
+    let find_options = mongodb::options::FindOptions::builder()
+        .skip(skip)
+        .limit(limit)
+        .build();
+    let mut cursor = collection.find(doc! {}).with_options(find_options).await?;
 
     while cursor.advance().await? {
         let doc = cursor.deserialize_current()?;
@@ -121,4 +140,34 @@ pub async fn update_db(
     }
 
     Ok(())
+}
+
+pub async fn get_user_websites(
+    collection: &Collection<Document>,
+    telegram_id: i32,
+) -> Result<Vec<Website>, mongodb::error::Error> {
+    let filter = doc! { "telegram_id": format!("{}", telegram_id) };
+
+    let mut cursor = collection.find(filter).await.map_err(|e| {
+        log::error!("Failed to query MongoDB: {}", e);
+        mongodb::error::Error::from(std::io::Error::other(e))
+    })?;
+
+    let mut websites: Vec<Website> = Vec::new();
+    while let Some(doc_result) = cursor.next().await {
+        match doc_result {
+            Ok(doc) => {
+                if let Ok(website) = mongodb::bson::from_document::<Website>(doc) {
+                    websites.push(website);
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to read document: {}", e);
+                return Err(mongodb::error::Error::from(std::io::Error::other(e)));
+            }
+        }
+    }
+
+    websites.sort_by(|a, b| a.url.cmp(&b.url));
+    Ok(websites)
 }
