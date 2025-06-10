@@ -14,7 +14,7 @@ enum Command {
     #[command(description = "About ManDown")]
     About,
     #[command(description = "Clear your list of your followed domains")]
-    Clear,
+    Clear(String),
     #[command(description = "I am here to help!")]
     Help,
     #[command(description = "Get a list of your followed domains")]
@@ -50,7 +50,17 @@ async fn answer(
 ) -> ResponseResult<()> {
     match cmd {
         Command::About => handle_about(bot, msg).await?,
-        Command::Clear => handle_clear(bot, msg, &collection).await?,
+        Command::Clear(confirmation) => {
+            if confirmation.to_lowercase() == "confirmed" {
+                handle_clear(bot, msg, &collection).await?;
+            } else {
+                bot.send_message(
+                    msg.chat.id, 
+                    "To clear your entire list of followed domains, please type `/clear confirmed`".to_string(),
+                )
+                .await?;
+            }
+        }
         Command::Help => {
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
                 .await?;
@@ -60,12 +70,8 @@ async fn answer(
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
                 .await?;
         }
-        Command::Track(website) => {
-            handle_track(bot, msg, website.to_lowercase(), &collection, client).await?
-        }
-        Command::Untrack(website) => {
-            handle_untrack(bot, msg, website.to_lowercase(), &collection).await?
-        }
+        Command::Track(website) => handle_track(bot, msg, website.to_lowercase(), &collection, client).await?,
+        Command::Untrack(website) => handle_untrack(bot, msg, website.to_lowercase(), &collection).await?,
     };
     Ok(())
 }
