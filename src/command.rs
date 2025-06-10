@@ -55,8 +55,9 @@ async fn answer(
                 handle_clear(bot, msg, &collection).await?;
             } else {
                 bot.send_message(
-                    msg.chat.id, 
-                    "To clear your entire list of followed domains, please type `/clear confirmed`".to_string(),
+                    msg.chat.id,
+                    "To clear your entire list of followed domains, please type `/clear confirmed`"
+                        .to_string(),
                 )
                 .await?;
             }
@@ -70,8 +71,12 @@ async fn answer(
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
                 .await?;
         }
-        Command::Track(website) => handle_track(bot, msg, website.to_lowercase(), &collection, client).await?,
-        Command::Untrack(website) => handle_untrack(bot, msg, website.to_lowercase(), &collection).await?,
+        Command::Track(website) => {
+            handle_track(bot, msg, website.to_lowercase(), &collection, client).await?
+        }
+        Command::Untrack(website) => {
+            handle_untrack(bot, msg, website.to_lowercase(), &collection).await?
+        }
     };
     Ok(())
 }
