@@ -85,7 +85,7 @@ pub async fn handle_track(
 
     let (normal_result, ssl_result) = join!(normal_check, ssl_check);
 
-    let messages = vec![normal_result, ssl_result];
+    let messages = [normal_result, ssl_result];
 
     if !messages.is_empty() {
         bot.send_message(msg.chat.id, messages.join("\n\n"))

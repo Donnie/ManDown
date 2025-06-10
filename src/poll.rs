@@ -6,9 +6,9 @@ use futures::future::join_all;
 use log::{error, info};
 use mongodb::Collection;
 use mongodb::bson::Document;
+use std::sync::Arc;
 use teloxide::Bot;
 use tokio::time;
-use std::sync::Arc;
 
 pub async fn downtime_check(
     collection: &Collection<Document>,
@@ -53,13 +53,8 @@ async fn check_sites(
     find_changed_websites(&websites, &new_statuses)
 }
 
-async fn fetch_website_statuses(
-    websites: &[Website],
-    client: Arc<reqwest::Client>,
-) -> Vec<u16> {
-    let status_futures = websites
-        .iter()
-        .map(|web| get_status(&client, &web.url));
+async fn fetch_website_statuses(websites: &[Website], client: Arc<reqwest::Client>) -> Vec<u16> {
+    let status_futures = websites.iter().map(|web| get_status(&client, &web.url));
     join_all(status_futures).await
 }
 
