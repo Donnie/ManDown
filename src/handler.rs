@@ -33,7 +33,8 @@ To clear your entire list of followed domains, please type:
 <pre>
 /clear confirmed
 </pre>
-"#.to_string();
+"#
+    .to_string();
 
     if confirmation.to_lowercase() == "confirmed" {
         let telegram_id = msg.from().unwrap().id.0 as i32;
@@ -45,7 +46,9 @@ To clear your entire list of followed domains, please type:
             }
         };
     }
-    bot.send_message(msg.chat.id, message).parse_mode(ParseMode::Html).await?;
+    bot.send_message(msg.chat.id, message)
+        .parse_mode(ParseMode::Html)
+        .await?;
     Ok(())
 }
 
