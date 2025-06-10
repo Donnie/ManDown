@@ -1,7 +1,7 @@
 use crate::alert::process;
 use crate::format::format_website_list;
 use crate::http::HttpClient;
-use crate::mongo::{delete_sites_by_hostname, get_user_websites, put_site};
+use crate::mongo::{clear_user_websites, delete_sites_by_hostname, get_user_websites, put_site};
 use crate::parse_url::{extract_hostname, read_url};
 use futures::join;
 use mongodb::Collection;
@@ -11,14 +11,44 @@ use teloxide::{prelude::*, types::ParseMode};
 
 pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
     let output = "<b>ManDown</b>:
-  Open Source on <a href='https://github.com/Donnie/ManDown'>GitHub</a>
-  Hosted on GCP in us-east-1
-  No personally identifiable information is stored or used by this bot.";
+Open Source on <a href='https://github.com/Donnie/ManDown'>GitHub</a>
+Hosted on GCP in us-east-1
+No personally identifiable information is stored or used by this bot.";
 
     bot.send_message(msg.chat.id, output)
         .parse_mode(ParseMode::Html)
         .await?;
 
+    Ok(())
+}
+
+pub async fn handle_clear(
+    bot: Bot,
+    msg: Message,
+    collection: &Collection<Document>,
+    confirmation: String,
+) -> ResponseResult<()> {
+    let mut message = r#"
+To clear your entire list of followed domains, please type:
+<pre>
+/clear confirmed
+</pre>
+"#
+    .to_string();
+
+    if confirmation.to_lowercase() == "confirmed" {
+        let telegram_id = msg.from().unwrap().id.0 as i32;
+        message = match clear_user_websites(collection, telegram_id).await {
+            Ok(count) => format!("Successfully cleared {} site(s)", count),
+            Err(e) => {
+                log::error!("Failed to clear user websites: {}", e);
+                format!("Failed to clear user websites: {}", e)
+            }
+        };
+    }
+    bot.send_message(msg.chat.id, message)
+        .parse_mode(ParseMode::Html)
+        .await?;
     Ok(())
 }
 

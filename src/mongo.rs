@@ -79,6 +79,18 @@ pub async fn put_site(
     Ok(result.inserted_id.as_object_id().unwrap())
 }
 
+pub async fn clear_user_websites(
+    collection: &Collection<Document>,
+    user_telegram_id: i32,
+) -> Result<u64, mongodb::error::Error> {
+    let filter = doc! {
+        "telegram_id": user_telegram_id.to_string()
+    };
+
+    let result = collection.delete_many(filter).await?;
+    Ok(result.deleted_count)
+}
+
 pub async fn delete_sites_by_hostname(
     collection: &Collection<Document>,
     hostname: &str,

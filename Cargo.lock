@@ -1251,7 +1251,7 @@ dependencies = [
 
 [[package]]
 name = "man_down"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "async-trait",
  "chrono",
