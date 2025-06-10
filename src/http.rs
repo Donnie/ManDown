@@ -28,10 +28,11 @@ impl HttpClient for reqwest::Client {
 
 // Function to create a client with preset timeout
 pub fn cust_client(timeout: u64) -> Arc<Client> {
-    Arc::new(Client::builder()
-        .timeout(std::time::Duration::from_secs(timeout))
-        .build()
-        .expect("Failed to build HTTP client")
+    Arc::new(
+        Client::builder()
+            .timeout(std::time::Duration::from_secs(timeout))
+            .build()
+            .expect("Failed to build HTTP client"),
     )
 }
 

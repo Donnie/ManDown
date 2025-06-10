@@ -1,14 +1,15 @@
+use std::sync::Arc;
+
+use crate::config::Config;
 use crate::http::HttpClient;
-use crate::{config::Config, http::cust_client};
 use futures::{StreamExt, stream::FuturesUnordered};
 
-pub async fn baseline_available() -> bool {
+pub async fn baseline_available(client: Arc<reqwest::Client>) -> bool {
     let config = Config::load().expect("Failed to load config");
-    let client = cust_client(30);
-    check_websites(&config.baseline_sites, &client).await
+    check_websites(&config.baseline_sites, &*client).await
 }
 
-async fn check_websites<T: HttpClient + 'static>(websites: &[String], client: &T) -> bool {
+async fn check_websites<T: HttpClient>(websites: &[String], client: &T) -> bool {
     // Early return for empty list
     if websites.is_empty() {
         return false;
@@ -22,7 +23,11 @@ async fn check_websites<T: HttpClient + 'static>(websites: &[String], client: &T
     // Use FuturesUnordered for efficient concurrent execution with early termination
     let mut futures = websites
         .iter()
-        .map(|site| async move { client.check_url(site).await })
+        .map(|site| {
+            let client = client.clone();
+            let site = site.to_string();
+            async move { client.check_url(&site).await }
+        })
         .collect::<FuturesUnordered<_>>();
 
     // Return true as soon as any future resolves to true
@@ -38,6 +43,7 @@ async fn check_websites<T: HttpClient + 'static>(websites: &[String], client: &T
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::http::cust_client;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -82,7 +88,7 @@ mod tests {
     async fn test_check_websites_with_real_config() {
         let config = Config::load().expect("Failed to load config");
         let client = cust_client(5);
-        let result = check_websites(&config.baseline_sites, &client).await;
+        let result = check_websites(&config.baseline_sites, &*client).await;
         println!("Completed without panicking. Available: {}", result);
     }
 
@@ -95,7 +101,7 @@ mod tests {
         ];
         let client = cust_client(5);
 
-        let result = check_websites(&fake_websites, &client).await;
+        let result = check_websites(&fake_websites, &*client).await;
         assert!(!result, "Fake websites should not be reachable");
     }
 
@@ -104,7 +110,7 @@ mod tests {
         let empty_websites: Vec<String> = vec![];
         let client = cust_client(5);
 
-        let result = check_websites(&empty_websites, &client).await;
+        let result = check_websites(&empty_websites, &*client).await;
         assert!(!result, "Empty websites list should return false");
     }
 }

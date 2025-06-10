@@ -12,7 +12,22 @@ use std::time::SystemTime;
 use teloxide::Bot;
 use tokio::time;
 
-pub async fn downtime_check(
+pub fn start_downtime_checker(
+    bot: Bot,
+    collection: Arc<Collection<Document>>,
+    http_client: Arc<reqwest::Client>,
+) {
+    let interval = dotenvy::var("FREQ")
+        .unwrap_or("600".to_string())
+        .parse()
+        .expect("FREQ must be a number");
+
+    tokio::spawn(async move {
+        downtime_check(&collection, interval, bot, http_client).await;
+    });
+}
+
+async fn downtime_check(
     collection: &Collection<Document>,
     interval: u64,
     bot: Bot,
@@ -31,7 +46,7 @@ async fn get_changed_sites(
 ) -> Vec<Website> {
     println!("Checking Websites now");
 
-    if !baseline_available().await {
+    if !baseline_available(client.clone()).await {
         println!("Baseline not available, skipping check.");
         return Vec::new();
     }
@@ -41,7 +56,11 @@ async fn get_changed_sites(
     const LIMIT: i64 = 20;
 
     loop {
-        println!("{}: Getting websites from DB, skip: {}", DateTime::<Utc>::from(SystemTime::now()).format("%Y-%m-%d %H:%M:%S").to_string(), skip);
+        println!(
+            "{}: Getting websites from DB, skip: {}",
+            DateTime::<Utc>::from(SystemTime::now()).format("%Y-%m-%d %H:%M:%S"),
+            skip
+        );
         let websites = match get_sites(collection, skip, LIMIT).await {
             Ok(sites) => sites,
             Err(e) => {
@@ -49,7 +68,11 @@ async fn get_changed_sites(
                 return Vec::new();
             }
         };
-        println!("{}: Got {} websites from DB", DateTime::<Utc>::from(SystemTime::now()).format("%Y-%m-%d %H:%M:%S").to_string(), websites.len());
+        println!(
+            "{}: Got {} websites from DB",
+            DateTime::<Utc>::from(SystemTime::now()).format("%Y-%m-%d %H:%M:%S"),
+            websites.len()
+        );
 
         if websites.is_empty() {
             break;
@@ -60,7 +83,11 @@ async fn get_changed_sites(
         all_changed_websites.extend(changed_in_batch);
 
         skip += LIMIT as u64;
-        println!("{}: Skipping {} websites", DateTime::<Utc>::from(SystemTime::now()).format("%Y-%m-%d %H:%M:%S").to_string(), skip);
+        println!(
+            "{}: Skipping {} websites",
+            DateTime::<Utc>::from(SystemTime::now()).format("%Y-%m-%d %H:%M:%S"),
+            skip
+        );
     }
 
     all_changed_websites

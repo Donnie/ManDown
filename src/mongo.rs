@@ -1,10 +1,12 @@
 use chrono::Utc;
 use futures::StreamExt;
 use mongodb::{
-    Collection,
+    Client, Collection,
     bson::{Document, doc},
+    options::ClientOptions,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Website {
@@ -14,6 +16,16 @@ pub struct Website {
     pub last_updated: String,
     pub status: i32,
     pub telegram_id: String,
+}
+
+pub async fn init_mongo() -> Arc<Collection<Document>> {
+    let uri = dotenvy::var("MONGODB_URI").expect("MONGODB_URI must be set");
+    let client_options = ClientOptions::parse(&uri)
+        .await
+        .expect("Failed to parse MongoDB URI");
+    let client = Client::with_options(client_options).expect("Failed to create MongoDB client");
+    let db = client.database("mandown");
+    Arc::new(db.collection::<Document>("websites"))
 }
 
 pub async fn put_site(
