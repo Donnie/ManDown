@@ -50,18 +50,7 @@ async fn answer(
 ) -> ResponseResult<()> {
     match cmd {
         Command::About => handle_about(bot, msg).await?,
-        Command::Clear(confirmation) => {
-            if confirmation.to_lowercase() == "confirmed" {
-                handle_clear(bot, msg, &collection).await?;
-            } else {
-                bot.send_message(
-                    msg.chat.id,
-                    "To clear your entire list of followed domains, please type `/clear confirmed`"
-                        .to_string(),
-                )
-                .await?;
-            }
-        }
+        Command::Clear(confirmation) => handle_clear(bot, msg, &collection, confirmation).await?,
         Command::Help => {
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
                 .await?;
