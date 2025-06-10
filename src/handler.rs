@@ -1,5 +1,5 @@
 use crate::alert::process;
-use crate::http::{HttpClient, cust_client};
+use crate::http::HttpClient;
 use crate::mongo::{delete_sites_by_hostname, put_site};
 use crate::parse_url::{extract_hostname, read_url};
 use futures::{StreamExt, join};
@@ -7,6 +7,7 @@ use mongodb::Collection;
 use mongodb::bson::{Document, doc};
 use teloxide::RequestError;
 use teloxide::{prelude::*, types::ParseMode};
+use std::sync::Arc;
 
 pub async fn handle_about(bot: Bot, msg: Message) -> ResponseResult<()> {
     let output = "<b>ManDown</b>:
@@ -92,6 +93,7 @@ pub async fn handle_track(
     msg: Message,
     website: String,
     collection: &Collection<Document>,
+    client: Arc<reqwest::Client>,
 ) -> ResponseResult<()> {
     let telegram_id = msg.from().unwrap().id.0 as i32;
 
@@ -103,7 +105,6 @@ pub async fn handle_track(
         return Ok(());
     }
 
-    let client = cust_client(30);
     let normal_check = check_and_track_url(&normal, collection, telegram_id, &client);
     let ssl_check = check_and_track_url(&ssl, collection, telegram_id, &client);
 

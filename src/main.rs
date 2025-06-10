@@ -9,6 +9,7 @@ mod poll;
 
 use dotenvy::dotenv;
 use handler::{handle_about, handle_list, handle_track, handle_untrack};
+use http::cust_client;
 use mongodb::{Client, Collection, bson::Document, options::ClientOptions};
 use poll::downtime_check;
 use std::sync::Arc;
@@ -41,6 +42,7 @@ async fn answer(
     msg: Message,
     cmd: Command,
     collection: Arc<Collection<Document>>,
+    client: Arc<reqwest::Client>,
 ) -> ResponseResult<()> {
     match cmd {
         Command::About => handle_about(bot, msg).await?,
@@ -58,7 +60,7 @@ async fn answer(
                 .await?;
         }
         Command::Track(website) => {
-            handle_track(bot, msg, website.to_lowercase(), &collection).await?
+            handle_track(bot, msg, website.to_lowercase(), &collection, client).await?
         }
         Command::Untrack(website) => {
             handle_untrack(bot, msg, website.to_lowercase(), &collection).await?
@@ -81,6 +83,7 @@ async fn main() {
     let client = Client::with_options(client_options).expect("Failed to create MongoDB client");
     let db = client.database("mandown");
     let collection = Arc::new(db.collection::<Document>("websites"));
+    let http_client = Arc::new(cust_client(30));
 
     // Get the polling frequency from the environment variable or use a default value
     let interval: u64 = dotenvy::var("FREQ")
@@ -94,14 +97,16 @@ async fn main() {
     // Start the polling function in the background
     let bot_clone = bot.clone();
     let collection_clone = collection.clone();
+    let http_client_clone = http_client.clone();
     tokio::spawn(async move {
-        downtime_check(&collection_clone, interval, bot_clone).await;
+        downtime_check(&collection_clone, interval, bot_clone, http_client_clone).await;
     });
 
     // Start the bot's command loop
     Command::repl(bot, move |bot, msg, cmd| {
         let collection = collection.clone();
-        async move { answer(bot, msg, cmd, collection).await }
+        let http_client = http_client.clone();
+        async move { answer(bot, msg, cmd, collection, http_client).await }
     })
     .await;
 }
