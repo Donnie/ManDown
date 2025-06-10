@@ -20,11 +20,17 @@ RUN adduser \
     "${USER}"
 
 # Copy the code into the container
-COPY src/ src/
-COPY config.yaml ./
+RUN rustup component add rustfmt clippy
 COPY Cargo.* ./
 
-RUN rustup component add rustfmt clippy
+# This is a workaround to avoid rebuilding the dependencies on every change.
+RUN mkdir src && \
+    echo 'fn main() {}' > src/main.rs && \
+    cargo build --release && \
+    rm -rf src target/release/man_down target/release/.fingerprint/man_down*
+
+COPY src/ src/
+COPY config.yaml ./
 
 RUN cargo fmt --all -- --check
 

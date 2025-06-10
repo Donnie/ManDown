@@ -56,12 +56,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx
-
       - name: Configure Docker for Artifact Registry
         run: |
           gcloud auth configure-docker ${{ vars.REGISTRY_URI }}
@@ -73,17 +67,12 @@ jobs:
           echo "image_name=$FULL_IMAGE_NAME" >> $GITHUB_ENV
 
       - name: "Build and push docker image"
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new
-          tags: ${{ env.image_name }}
           push: true
-
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          tags: ${{ env.image_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Set prod image variable
         run: |
