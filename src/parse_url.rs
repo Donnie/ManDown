@@ -32,7 +32,7 @@ pub fn extract_hostname(input: &str) -> String {
             let host_str = url.host_str().unwrap_or_default();
             if let Some(port) = url.port() {
                 // Use format! only when we actually have a port
-                format!("{}:{}", host_str, port)
+                format!("{host_str}:{port}")
             } else {
                 // Avoid .to_string() allocation by using String::from
                 String::from(host_str)

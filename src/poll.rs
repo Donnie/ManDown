@@ -56,7 +56,7 @@ async fn get_changed_sites(
         let websites = match get_sites(collection, skip, LIMIT).await {
             Ok(sites) => sites,
             Err(e) => {
-                log::error!("Error getting websites from DB: {}", e);
+                log::error!("Error getting websites from DB: {e}");
                 return Vec::new();
             }
         };
@@ -96,6 +96,6 @@ async fn handle_changed_websites(
     alert_users(bot, changed_websites).await;
 
     if let Err(e) = update_db(collection, changed_websites).await {
-        log::error!("Error updating websites in DB: {}", e);
+        log::error!("Error updating websites in DB: {e}");
     }
 }

@@ -7,6 +7,7 @@ use mongodb::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Website {
@@ -20,9 +21,19 @@ pub struct Website {
 
 pub async fn init_mongo() -> Arc<Collection<Document>> {
     let uri = dotenvy::var("MONGODB_URI").expect("MONGODB_URI must be set");
-    let client_options = ClientOptions::parse(&uri)
+    let mut client_options = ClientOptions::parse(&uri)
         .await
         .expect("Failed to parse MongoDB URI");
+
+    // Configure timeouts to prevent deadline exceeded errors
+    client_options.server_selection_timeout = Some(Duration::from_secs(5));
+    client_options.connect_timeout = Some(Duration::from_secs(5));
+    client_options.max_pool_size = Some(10);
+    client_options.min_pool_size = Some(1);
+    client_options.max_idle_time = Some(Duration::from_secs(300)); // 5 minutes
+    client_options.retry_writes = Some(true);
+    client_options.retry_reads = Some(true);
+
     let client = Client::with_options(client_options).expect("Failed to create MongoDB client");
     let db = client.database("mandown");
     Arc::new(db.collection::<Document>("websites"))
@@ -99,7 +110,7 @@ pub async fn delete_sites_by_hostname(
     if hostname.len() < 3 {
         return Ok(0);
     }
-    let pattern = format!("://{}", hostname);
+    let pattern = format!("://{hostname}");
     let filter = doc! {
         "url": { "$regex": pattern },
         "telegram_id": user_telegram_id.to_string()
@@ -158,10 +169,10 @@ pub async fn get_user_websites(
     collection: &Collection<Document>,
     telegram_id: i32,
 ) -> Result<Vec<Website>, mongodb::error::Error> {
-    let filter = doc! { "telegram_id": format!("{}", telegram_id) };
+    let filter = doc! { "telegram_id": format!("{telegram_id}") };
 
     let mut cursor = collection.find(filter).await.map_err(|e| {
-        log::error!("Failed to query MongoDB: {}", e);
+        log::error!("Failed to query MongoDB: {e}");
         mongodb::error::Error::from(std::io::Error::other(e))
     })?;
 
@@ -174,7 +185,7 @@ pub async fn get_user_websites(
                 }
             }
             Err(e) => {
-                log::error!("Failed to read document: {}", e);
+                log::error!("Failed to read document: {e}");
                 return Err(mongodb::error::Error::from(std::io::Error::other(e)));
             }
         }
