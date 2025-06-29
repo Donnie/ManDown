@@ -110,7 +110,7 @@ pub async fn delete_sites_by_hostname(
     if hostname.len() < 3 {
         return Ok(0);
     }
-    let pattern = format!("://{}", hostname);
+    let pattern = format!("://{hostname}");
     let filter = doc! {
         "url": { "$regex": pattern },
         "telegram_id": user_telegram_id.to_string()
@@ -169,10 +169,10 @@ pub async fn get_user_websites(
     collection: &Collection<Document>,
     telegram_id: i32,
 ) -> Result<Vec<Website>, mongodb::error::Error> {
-    let filter = doc! { "telegram_id": format!("{}", telegram_id) };
+    let filter = doc! { "telegram_id": format!("{telegram_id}") };
 
     let mut cursor = collection.find(filter).await.map_err(|e| {
-        log::error!("Failed to query MongoDB: {}", e);
+        log::error!("Failed to query MongoDB: {e}");
         mongodb::error::Error::from(std::io::Error::other(e))
     })?;
 
@@ -185,7 +185,7 @@ pub async fn get_user_websites(
                 }
             }
             Err(e) => {
-                log::error!("Failed to read document: {}", e);
+                log::error!("Failed to read document: {e}");
                 return Err(mongodb::error::Error::from(std::io::Error::other(e)));
             }
         }

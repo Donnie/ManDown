@@ -15,32 +15,29 @@ pub async fn alert_users(bot: Bot, changed_webs: &[Website]) {
             .parse_mode(ParseMode::Html)
             .await
         {
-            info!("Failed to send message to {}: {}", chat_id, e);
+            info!("Failed to send message to {chat_id}: {e}");
         }
     }
 }
 
 pub fn process(site: &str, code: i32) -> String {
-    let mut output = format!("Site: {}\n\n", site);
+    let mut output = format!("Site: {site}\n\n");
 
     match code {
         0 | 1 => output += "Hoppla! We faced an error trying to reach the site! 🤒",
         200..=299 => {
             output += &format!(
-                "Joohoo! It's live and kicking! 🙂\n\nStatus: <a href='https://httpstatuses.com/{}'>{}</a>",
-                code, code
+                "Joohoo! It's live and kicking! 🙂\n\nStatus: <a href='https://httpstatuses.com/{code}'>{code}</a>"
             )
         }
         400..=499 => {
             output += &format!(
-                "Erm! Did I do something wrong? 🤔\n\nStatus: <a href='https://httpstatuses.com/{}'>{}</a>",
-                code, code
+                "Erm! Did I do something wrong? 🤔\n\nStatus: <a href='https://httpstatuses.com/{code}'>{code}</a>"
             )
         }
         500..=599 => {
             output += &format!(
-                "Schade! It's down or inaccessible to me! 😟\n\nStatus: <a href='https://httpstatuses.com/{}'>{}</a>",
-                code, code
+                "Schade! It's down or inaccessible to me! 😟\n\nStatus: <a href='https://httpstatuses.com/{code}'>{code}</a>"
             )
         }
         _ => output += "Something is fishy! 🐟",

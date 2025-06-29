@@ -39,10 +39,10 @@ To clear your entire list of followed domains, please type:
     if confirmation.to_lowercase() == "confirmed" {
         let telegram_id = msg.from().unwrap().id.0 as i32;
         message = match clear_user_websites(collection, telegram_id).await {
-            Ok(count) => format!("Successfully cleared {} site(s)", count),
+            Ok(count) => format!("Successfully cleared {count} site(s)"),
             Err(e) => {
-                log::error!("Failed to clear user websites: {}", e);
-                format!("Failed to clear user websites: {}", e)
+                log::error!("Failed to clear user websites: {e}");
+                format!("Failed to clear user websites: {e}")
             }
         };
     }
@@ -62,7 +62,7 @@ pub async fn handle_list(
     let message = match get_user_websites(collection, telegram_id).await {
         Ok(websites) => format_website_list(&websites),
         Err(e) => {
-            log::error!("Failed to get user websites: {}", e);
+            log::error!("Failed to get user websites: {e}");
             "Failed to get user websites".to_string()
         }
     };
@@ -85,8 +85,8 @@ async fn check_and_track_url(
 
     if status == 200 {
         if let Err(e) = put_site(collection, url, telegram_id).await {
-            log::error!("Failed to insert site {}: {}", url, e);
-            message = format!("Failed to track <code>{}</code>", url);
+            log::error!("Failed to insert site {url}: {e}");
+            message = format!("Failed to track <code>{url}</code>");
         }
     }
 
@@ -144,11 +144,11 @@ pub async fn handle_untrack(
     let result = delete_sites_by_hostname(collection, &hostname, telegram_id).await;
 
     let message = match result {
-        Ok(0) => format!("No sites found for {}", hostname),
-        Ok(count) => format!("Successfully untracked {} site(s) for {}", count, hostname),
+        Ok(0) => format!("No sites found for {hostname}"),
+        Ok(count) => format!("Successfully untracked {count} site(s) for {hostname}"),
         Err(e) => {
-            log::error!("Error untracking {}: {}", hostname, e);
-            format!("An error occurred while untracking {}", hostname)
+            log::error!("Error untracking {hostname}: {e}");
+            format!("An error occurred while untracking {hostname}")
         }
     };
 
