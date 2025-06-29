@@ -31,7 +31,6 @@ pub async fn init_mongo() -> Arc<Collection<Document>> {
     client_options.max_pool_size = Some(10);
     client_options.min_pool_size = Some(1);
     client_options.max_idle_time = Some(Duration::from_secs(300)); // 5 minutes
-    client_options.retry_writes = Some(true);
     client_options.retry_reads = Some(true);
 
     let client = Client::with_options(client_options).expect("Failed to create MongoDB client");

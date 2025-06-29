@@ -1,4 +1,4 @@
-FROM rust:alpine as builder
+FROM rust:alpine AS builder
 RUN apk update && apk add --no-cache pkgconfig musl-dev openssl-dev
 
 # Set necessary environmet variables needed for our image
