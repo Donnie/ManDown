@@ -89,7 +89,7 @@ mod tests {
         let config = Config::load().expect("Failed to load config");
         let client = cust_client(5);
         let result = check_websites(&config.baseline_sites, &*client).await;
-        println!("Completed without panicking. Available: {}", result);
+        println!("Completed without panicking. Available: {result}");
     }
 
     #[tokio::test]
