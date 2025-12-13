@@ -83,11 +83,11 @@ async fn check_and_track_url(
     let status = client.get_status_code(url).await;
     let mut message = process(url, status as i32);
 
-    if status == 200 {
-        if let Err(e) = put_site(collection, url, telegram_id).await {
-            log::error!("Failed to insert site {url}: {e}");
-            message = format!("Failed to track <code>{url}</code>");
-        }
+    if status == 200
+        && let Err(e) = put_site(collection, url, telegram_id).await
+    {
+        log::error!("Failed to insert site {url}: {e}");
+        message = format!("Failed to track <code>{url}</code>");
     }
 
     message
