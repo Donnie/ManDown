@@ -33,7 +33,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Authenticate to Google Cloud
       id: auth
@@ -99,7 +99,7 @@ jobs:
         echo 'EOF' >> $GITHUB_ENV
 
     - name: Comment PR with Plan
-      uses: actions/github-script@v7
+      uses: actions/github-script@v9
       if: github.event_name == 'pull_request'
       with:
         script: |
@@ -158,7 +158,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Authenticate to Google Cloud
       id: auth
