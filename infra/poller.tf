@@ -9,21 +9,40 @@ resource "google_cloud_run_v2_job" "poller" {
 
   template {
     template {
+      service_account = "${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+
       containers {
         image = var.image_poller
 
         env {
-          name  = "TELOXIDE_TOKEN"
-          value = var.teloxide_token
+          name = "TELOXIDE_TOKEN"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.teloxide_token.secret_id
+              version = "latest"
+            }
+          }
         }
 
         env {
-          name  = "MONGODB_URI"
-          value = var.mongodb_uri
+          name = "MONGODB_URI"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.mongodb_uri.secret_id
+              version = "latest"
+            }
+          }
         }
       }
     }
   }
+
+  depends_on = [
+    google_secret_manager_secret_version.teloxide_token,
+    google_secret_manager_secret_version.mongodb_uri,
+    google_secret_manager_secret_iam_member.teloxide_token_accessor,
+    google_secret_manager_secret_iam_member.mongodb_uri_accessor,
+  ]
 }
 
 resource "google_cloud_run_v2_job_iam_member" "poller_scheduler_invoker" {
