@@ -3,7 +3,7 @@ name: Webhook Build and Push
 on:
   push:
     branches:
-      - v3
+      - main
 
 env:
   GH_TOKEN: ${{ secrets.MANDOWN_PAT }}

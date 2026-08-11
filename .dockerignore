@@ -1,9 +1,0 @@
-.dockerignore
-.env
-.env.local
-db
-.git
-target
-.vscode
-.github
-Dockerfile

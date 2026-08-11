@@ -23,12 +23,13 @@ For any kind of uptime guarantees it is best to host it on your cloud account.
 Add your Telegram bot token to the .env file and then
 
 ```bash
-cargo run .
+cargo run -p man_down_poller
+cargo run -p man_down_webhook
 ```
 
 ### Build for release
 ```bash
-cargo build --release
+cargo build --release --workspace
 ```
 
 ## Functions

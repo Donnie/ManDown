@@ -5,13 +5,11 @@ on:
     branches:
       - main
     paths:
-      - '.dockerignore'
+      - '.containerignore'
       - 'Cargo.lock'
       - 'Cargo.toml'
       - 'config.yaml'
-      - 'Dockerfile'
       - 'crates/**'
-      - 'src/**'
     types: [opened, synchronize, reopened]
 
 jobs:
@@ -54,7 +52,7 @@ jobs:
       - name: Get head version
         id: head
         run: |
-          HEAD_VERSION=$(grep '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          HEAD_VERSION=$(grep '^version = ' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
           echo "Head version from Cargo.toml: $HEAD_VERSION"
           echo "head_version=$HEAD_VERSION" >> $GITHUB_OUTPUT
 
@@ -82,11 +80,11 @@ jobs:
             new_patch=$((base_patch + 1))
             NEW_VERSION="${base_major}.${base_minor}.${new_patch}"
 
-            # Update Cargo.toml with new version
+            # Update workspace version in Cargo.toml
             sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" Cargo.toml
-            
-            # Update Cargo.lock with new version
-            cargo update --workspace
+
+            # Refresh lockfile for workspace package versions
+            cargo metadata --format-version 1 --no-deps >/dev/null
 
             # Commit and push the change
             git config --local user.email "github-actions[bot]@users.noreply.github.com"

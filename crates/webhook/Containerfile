@@ -18,7 +18,6 @@ RUN adduser \
 
 RUN rustup component add rustfmt clippy
 COPY Cargo.toml Cargo.lock ./
-COPY src/ src/
 COPY crates/ crates/
 COPY config.yaml ./
 

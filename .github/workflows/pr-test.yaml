@@ -6,10 +6,10 @@ on:
     paths:
       - 'Cargo.toml'
       - 'Cargo.lock'
-      - 'src/**'
       - 'crates/**'
       - 'config.yaml'
-      - 'Dockerfile'
+      - 'crates/poller/Containerfile'
+      - 'crates/webhook/Containerfile'
 
 env:
   CARGO_TERM_COLOR: always
