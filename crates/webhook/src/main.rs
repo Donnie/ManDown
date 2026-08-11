@@ -25,10 +25,12 @@ async fn main() {
         .expect("WEBHOOK_URL must be set")
         .parse()
         .expect("WEBHOOK_URL must be a valid URL");
+    let webhook_token = std::env::var("WEBHOOK_TOKEN").expect("WEBHOOK_TOKEN must be set");
 
     log::info!("Webhook bot listening on 0.0.0.0:{port}");
 
-    let listener = webhooks::axum(bot.clone(), webhooks::Options::new(addr, url))
+    let options = webhooks::Options::new(addr, url).secret_token(webhook_token);
+    let listener = webhooks::axum(bot.clone(), options)
         .await
         .expect("Couldn't setup webhook");
 
