@@ -30,6 +30,11 @@ variable "image" {
   type        = string
 }
 
+variable "image_poller" {
+  description = "Poller image"
+  type        = string
+}
+
 variable "teloxide_token" {
   description = "Teloxide token"
   type        = string
