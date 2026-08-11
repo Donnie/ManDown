@@ -26,6 +26,9 @@ jobs:
     name: Build and Push Poller
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Build and push poller container
         uses: ./.github/actions/podman-build
         with:

@@ -63,14 +63,18 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
       - name: Build poller container
         uses: ./.github/actions/podman-build
         with:
           containerfile: crates/poller/Containerfile
           image_name: mandown-poller
           tag: ci
-          checkout_ref: ${{ github.event.pull_request.head.sha }}
-          fetch_depth: '0'
 
   webhook-container:
     name: Build Webhook Container
@@ -79,14 +83,18 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
       - name: Build webhook container
         uses: ./.github/actions/podman-build
         with:
           containerfile: crates/webhook/Containerfile
           image_name: mandown-webhook
           tag: ci
-          checkout_ref: ${{ github.event.pull_request.head.sha }}
-          fetch_depth: '0'
 
   security-audit:
     name: Security Audit

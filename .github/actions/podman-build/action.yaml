@@ -1,5 +1,5 @@
 name: Podman Build Container
-description: Checkout, build, and optionally push a container with Podman
+description: Build and optionally push a container with Podman
 
 inputs:
   containerfile:
@@ -12,14 +12,6 @@ inputs:
     description: Image tag. If empty, uses the workspace version from Cargo.toml
     required: false
     default: ''
-  checkout_ref:
-    description: Git ref to check out. Defaults to the triggering commit
-    required: false
-    default: ''
-  fetch_depth:
-    description: Fetch depth for checkout
-    required: false
-    default: '1'
   push:
     description: Whether to push the image to Artifact Registry
     required: false
@@ -32,12 +24,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Checkout
-      uses: actions/checkout@v7
-      with:
-        ref: ${{ inputs.checkout_ref || github.sha }}
-        fetch-depth: ${{ inputs.fetch_depth }}
-
     - name: Resolve image tag
       id: tag
       shell: bash

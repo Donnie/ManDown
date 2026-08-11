@@ -26,6 +26,9 @@ jobs:
     name: Build and Push Webhook
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Build and push webhook container
         uses: ./.github/actions/podman-build
         with:
