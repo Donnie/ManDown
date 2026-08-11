@@ -151,17 +151,19 @@ jobs:
   terraform-apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
       - name: Find Cargo tag
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           tag=$(grep "^version = " Cargo.toml | sed 's/version = "\(.*\)"/\1/')
           echo "CARGO_TAG=$tag" >> "$GITHUB_ENV"
 
       - name: Verify version consistency
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
