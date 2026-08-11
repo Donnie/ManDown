@@ -36,3 +36,7 @@ jobs:
           image_name: mandown-webhook
           push: 'true'
           github_variable: IMAGE_WEBHOOK
+          repository_uri: ${{ vars.REPOSITORY_URI }}
+          registry_uri: ${{ vars.REGISTRY_URI }}
+          gcp_project_id: ${{ vars.GCP_PROJECT_ID }}
+          gcp_wif: ${{ vars.GCP_WIF }}

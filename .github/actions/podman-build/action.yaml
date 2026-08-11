@@ -20,6 +20,18 @@ inputs:
     description: If set after a push, update this GitHub Actions variable with the image name
     required: false
     default: ''
+  repository_uri:
+    description: Artifact Registry repository URI
+    required: true
+  registry_uri:
+    description: Artifact Registry host URI
+    required: true
+  gcp_project_id:
+    description: GCP project ID
+    required: true
+  gcp_wif:
+    description: GCP workload identity provider
+    required: true
 
 runs:
   using: composite
@@ -31,7 +43,7 @@ runs:
         TAG_INPUT: ${{ inputs.tag }}
         IMAGE_NAME: ${{ inputs.image_name }}
         PUSH: ${{ inputs.push }}
-        REPOSITORY_URI: ${{ vars.REPOSITORY_URI }}
+        REPOSITORY_URI: ${{ inputs.repository_uri }}
       run: |
         if [ -n "$TAG_INPUT" ]; then
           tag="$TAG_INPUT"
@@ -53,14 +65,14 @@ runs:
       uses: google-github-actions/auth@v3
       with:
         create_credentials_file: 'true'
-        project_id: ${{ vars.GCP_PROJECT_ID }}
-        workload_identity_provider: ${{ vars.GCP_WIF }}
+        project_id: ${{ inputs.gcp_project_id }}
+        workload_identity_provider: ${{ inputs.gcp_wif }}
 
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v3
       with:
         install_components: gcloud
-        project_id: ${{ vars.GCP_PROJECT_ID }}
+        project_id: ${{ inputs.gcp_project_id }}
 
     - name: Install Podman
       shell: bash
@@ -70,8 +82,10 @@ runs:
 
     - name: Authenticate Podman to Artifact Registry
       shell: bash
+      env:
+        REGISTRY_URI: ${{ inputs.registry_uri }}
       run: |
-        gcloud auth print-access-token | podman login -u oauth2accesstoken --password-stdin ${{ vars.REGISTRY_URI }}
+        gcloud auth print-access-token | podman login -u oauth2accesstoken --password-stdin "$REGISTRY_URI"
 
     - name: Build container
       shell: bash
