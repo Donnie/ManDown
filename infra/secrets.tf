@@ -7,8 +7,9 @@ resource "google_secret_manager_secret" "teloxide_token" {
 }
 
 resource "google_secret_manager_secret_version" "teloxide_token" {
-  secret      = google_secret_manager_secret.teloxide_token.id
-  secret_data = var.teloxide_token
+  secret                 = google_secret_manager_secret.teloxide_token.id
+  secret_data_wo         = var.teloxide_token
+  secret_data_wo_version = 1
 }
 
 resource "google_secret_manager_secret" "mongodb_uri" {
@@ -20,8 +21,9 @@ resource "google_secret_manager_secret" "mongodb_uri" {
 }
 
 resource "google_secret_manager_secret_version" "mongodb_uri" {
-  secret      = google_secret_manager_secret.mongodb_uri.id
-  secret_data = var.mongodb_uri
+  secret                 = google_secret_manager_secret.mongodb_uri.id
+  secret_data_wo         = var.mongodb_uri
+  secret_data_wo_version = 1
 }
 
 resource "google_secret_manager_secret_iam_member" "teloxide_token_accessor" {
