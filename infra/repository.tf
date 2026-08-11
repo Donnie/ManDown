@@ -6,22 +6,30 @@ resource "google_artifact_registry_repository" "mandown" {
   cleanup_policy_dry_run = false
 
   cleanup_policies {
-    id     = "delete-old-images"
+    id     = "delete-untagged"
     action = "DELETE"
     condition {
-      tag_state  = "TAGGED"
-      older_than = "7d"
-      tag_prefixes = [
-        "dev-",
-      ]
+      tag_state  = "UNTAGGED"
+      older_than = "1d"
     }
   }
 
   cleanup_policies {
-    id     = "keep-3-latest-images"
+    id     = "delete-old-versions"
+    action = "DELETE"
+    condition {
+      tag_state  = "ANY"
+      older_than = "14d"
+    }
+  }
+
+  # Per-package floor: keeps active app images plus enough buildcache layers for hits.
+  cleanup_policies {
+    id     = "keep-minimum-versions"
     action = "KEEP"
     most_recent_versions {
-      keep_count = 3
+      package_name_prefixes = ["mandown"]
+      keep_count            = 10
     }
   }
 }
