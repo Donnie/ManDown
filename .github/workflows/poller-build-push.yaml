@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - '.containerignore'
-      - '.github/actions/podman-build/**'
+      - '.dockerignore'
+      - '.github/actions/container-build/**'
       - '.github/workflows/poller-build-push.yaml'
       - 'Cargo.lock'
       - 'Cargo.toml'
@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Build and push poller container
-        uses: ./.github/actions/podman-build
+        uses: ./.github/actions/container-build
         with:
           containerfile: crates/poller/Containerfile
           image_name: mandown-poller

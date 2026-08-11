@@ -23,13 +23,15 @@ resource "google_artifact_registry_repository" "mandown" {
     }
   }
 
-  # Per-package floor: keeps active app images plus enough buildcache layers for hits.
   cleanup_policies {
     id     = "keep-minimum-versions"
     action = "KEEP"
     most_recent_versions {
-      package_name_prefixes = ["mandown"]
-      keep_count            = 10
+      package_name_prefixes = [
+        "mandown-poller",
+        "mandown-webhook",
+      ]
+      keep_count = 10
     }
   }
 }
