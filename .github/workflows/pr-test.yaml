@@ -2,15 +2,13 @@ name: PR Tests
 
 on:
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
     paths:
-      - '.github/actions/podman-build/**'
-      - 'Cargo.toml'
       - 'Cargo.lock'
-      - 'crates/**'
+      - 'Cargo.toml'
       - 'config.yaml'
-      - 'crates/poller/Containerfile'
-      - 'crates/webhook/Containerfile'
+      - 'crates/**'
 
 env:
   CARGO_TERM_COLOR: always
@@ -19,45 +17,44 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v7
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-        fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: rustfmt, clippy
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
-    - name: Cache cargo registry
-      uses: actions/cache@v6
-      with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+      - name: Cache cargo registry
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
-    - name: Check version
-      run: cargo version
+      - name: Check version
+        run: cargo version
 
-    - name: Check formatting
-      run: cargo fmt --all -- --check
+      - name: Check formatting
+        run: cargo fmt --all -- --check
 
-    - name: Run clippy
-      run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-    - name: Build project
-      run: cargo build --workspace --verbose
+      - name: Build project
+        run: cargo build --workspace --verbose
 
-    - name: Run tests
-      run: cargo test --workspace --verbose
+      - name: Run tests
+        run: cargo test --workspace --verbose
 
   poller-container:
     name: Build Poller Container
@@ -65,20 +62,15 @@ jobs:
     permissions:
       contents: read
       id-token: write
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v7
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-        fetch-depth: 0
-
-    - name: Build poller container
-      uses: ./.github/actions/podman-build
-      with:
-        containerfile: crates/poller/Containerfile
-        image: mandown-poller:ci
-        cache_image: ${{ vars.REPOSITORY_URI }}/mandown-poller-buildcache
+      - name: Build poller container
+        uses: ./.github/actions/podman-build
+        with:
+          containerfile: crates/poller/Containerfile
+          image_name: mandown-poller
+          tag: ci
+          checkout_ref: ${{ github.event.pull_request.head.sha }}
+          fetch_depth: '0'
 
   webhook-container:
     name: Build Webhook Container
@@ -86,49 +78,43 @@ jobs:
     permissions:
       contents: read
       id-token: write
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v7
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-        fetch-depth: 0
-
-    - name: Build webhook container
-      uses: ./.github/actions/podman-build
-      with:
-        containerfile: crates/webhook/Containerfile
-        image: mandown-webhook:ci
-        cache_image: ${{ vars.REPOSITORY_URI }}/mandown-webhook-buildcache
+      - name: Build webhook container
+        uses: ./.github/actions/podman-build
+        with:
+          containerfile: crates/webhook/Containerfile
+          image_name: mandown-webhook
+          tag: ci
+          checkout_ref: ${{ github.event.pull_request.head.sha }}
+          fetch_depth: '0'
 
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v7
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-        fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: Cache cargo registry
-      uses: actions/cache@v6
-      with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+      - name: Cache cargo registry
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
-    - name: Install cargo-audit
-      run: cargo install cargo-audit --locked
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
 
-    - name: Run security audit
-      run: cargo audit
+      - name: Run security audit
+        run: cargo audit

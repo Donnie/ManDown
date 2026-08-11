@@ -1,18 +1,27 @@
 name: Podman Build Container
-description: Build a container with Podman, using Artifact Registry for layer cache
+description: Checkout, build, and optionally push a container with Podman
 
 inputs:
   containerfile:
     description: Path to the Containerfile
     required: true
-  image:
-    description: Image reference to tag (and optionally push)
+  image_name:
+    description: Image name without registry or tag (e.g. mandown-poller)
     required: true
-  cache_image:
-    description: Artifact Registry repository for build cache (no tag)
-    required: true
+  tag:
+    description: Image tag. If empty, uses the workspace version from Cargo.toml
+    required: false
+    default: ''
+  checkout_ref:
+    description: Git ref to check out. Defaults to the triggering commit
+    required: false
+    default: ''
+  fetch_depth:
+    description: Fetch depth for checkout
+    required: false
+    default: '1'
   push:
-    description: Whether to push the image to the registry
+    description: Whether to push the image to Artifact Registry
     required: false
     default: 'false'
   github_variable:
@@ -23,6 +32,37 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ inputs.checkout_ref || github.sha }}
+        fetch-depth: ${{ inputs.fetch_depth }}
+
+    - name: Resolve image tag
+      id: tag
+      shell: bash
+      env:
+        TAG_INPUT: ${{ inputs.tag }}
+        IMAGE_NAME: ${{ inputs.image_name }}
+        PUSH: ${{ inputs.push }}
+        REPOSITORY_URI: ${{ vars.REPOSITORY_URI }}
+      run: |
+        if [ -n "$TAG_INPUT" ]; then
+          tag="$TAG_INPUT"
+        else
+          tag=$(grep "^version = " Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+        fi
+
+        if [ "$PUSH" = "true" ]; then
+          image="${REPOSITORY_URI}/${IMAGE_NAME}:${tag}"
+        else
+          image="${IMAGE_NAME}:${tag}"
+        fi
+
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        echo "image=$image" >> "$GITHUB_OUTPUT"
+        echo "cache_image=${REPOSITORY_URI}/${IMAGE_NAME}-buildcache" >> "$GITHUB_OUTPUT"
+
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v3
       with:
@@ -50,8 +90,8 @@ runs:
     - name: Build container
       shell: bash
       env:
-        IMAGE: ${{ inputs.image }}
-        CACHE_IMAGE: ${{ inputs.cache_image }}
+        IMAGE: ${{ steps.tag.outputs.image }}
+        CACHE_IMAGE: ${{ steps.tag.outputs.cache_image }}
         CONTAINERFILE: ${{ inputs.containerfile }}
         PUSH: ${{ inputs.push }}
       run: |
@@ -70,7 +110,7 @@ runs:
       if: inputs.push == 'true' && inputs.github_variable != ''
       shell: bash
       env:
-        IMAGE: ${{ inputs.image }}
+        IMAGE: ${{ steps.tag.outputs.image }}
         GITHUB_VARIABLE: ${{ inputs.github_variable }}
       run: |
         gh variable set "$GITHUB_VARIABLE" -b "$IMAGE"

@@ -1,0 +1,1 @@
+- Follow DRY and YAGNI

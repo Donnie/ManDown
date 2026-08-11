@@ -26,19 +26,10 @@ jobs:
     name: Build and Push Poller
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v7
-
-      - name: Find Cargo tag
-        run: |
-          tag=$(grep "^version = " Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
-          echo "CARGO_TAG=$tag" >> $GITHUB_ENV
-
       - name: Build and push poller container
         uses: ./.github/actions/podman-build
         with:
           containerfile: crates/poller/Containerfile
-          image: ${{ vars.REPOSITORY_URI }}/mandown-poller:${{ env.CARGO_TAG }}
-          cache_image: ${{ vars.REPOSITORY_URI }}/mandown-poller-buildcache
+          image_name: mandown-poller
           push: 'true'
           github_variable: IMAGE_POLLER
