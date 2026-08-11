@@ -20,23 +20,24 @@ pub fn start_downtime_checker(
         .expect("FREQ must be a number");
 
     tokio::spawn(async move {
-        downtime_check(&collection, interval, bot, http_client).await;
+        let collection = collection;
+        let bot = bot;
+        let client = http_client;
+        loop {
+            run_once(&collection, bot.clone(), client.clone()).await;
+            time::sleep(time::Duration::from_secs(interval)).await;
+        }
     });
 }
 
-async fn downtime_check(
-    collection: &Collection<Document>,
-    interval: u64,
-    bot: Bot,
-    client: Arc<reqwest::Client>,
-) {
-    loop {
-        log::info!("Starting downtime check");
-        let changed_websites = get_changed_sites(collection, client.clone()).await;
-        log::info!("Found {} changed websites", changed_websites.len());
-        handle_changed_websites(collection, bot.clone(), &changed_websites).await;
-        time::sleep(time::Duration::from_secs(interval)).await;
-    }
+/// Run a single downtime-check sweep: fetch all tracked sites, alert on
+/// status changes, and persist the new statuses. Used by the one-shot
+/// poller binary (Cloud Run + Cloud Scheduler).
+pub async fn run_once(collection: &Collection<Document>, bot: Bot, client: Arc<reqwest::Client>) {
+    log::info!("Starting downtime check");
+    let changed_websites = get_changed_sites(collection, client.clone()).await;
+    log::info!("Found {} changed websites", changed_websites.len());
+    handle_changed_websites(collection, bot, &changed_websites).await;
 }
 
 async fn get_changed_sites(

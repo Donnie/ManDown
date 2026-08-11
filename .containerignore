@@ -1,0 +1,11 @@
+.containerignore
+.env
+.env.local
+db
+.git
+target
+.vscode
+.github
+infra
+V3_PLAN.md
+**/Containerfile

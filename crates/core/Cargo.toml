@@ -1,0 +1,20 @@
+[package]
+name = "man_down_core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+async-trait = "0.1"
+chrono = "0.4"
+dotenvy = "0.15"
+env_logger = "0.11"
+futures = "0.3.28"
+log = "0.4"
+mongodb = "3.8.0"
+reqwest = { version = "0.11.4", features = ["blocking", "json"] }
+serde = "1.0.130"
+serde_derive = "1.0.130"
+serde_yaml = "0.9"
+teloxide = { version = "0.12", features = ["auto-send", "macros"] }
+tokio = { version = "1.8.3", features = ["full"] }
+url = "2.2"

@@ -86,6 +86,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_check_websites_with_real_config() {
+        let config_path = format!("{}/../../config.yaml", env!("CARGO_MANIFEST_DIR"));
+        unsafe {
+            std::env::set_var("MANDOWN_CONFIG", &config_path);
+        }
         let config = Config::load().expect("Failed to load config");
         let client = cust_client(5);
         let result = check_websites(&config.baseline_sites, &*client).await;

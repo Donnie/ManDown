@@ -1,0 +1,41 @@
+FROM rust:alpine AS builder
+RUN apk update && apk add --no-cache pkgconfig musl-dev openssl-dev
+
+ENV RUSTFLAGS='-C target-feature=-crt-static'
+
+WORKDIR /build
+
+ENV USER=appuser
+ENV UID=10001
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/nonexistent" \
+    --shell "/sbin/nologin" \
+    --no-create-home \
+    --uid "${UID}" \
+    "${USER}"
+
+RUN rustup component add rustfmt clippy
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+COPY config.yaml ./
+
+RUN cargo fmt --all -- --check
+RUN cargo clippy -p man_down_core -p man_down_poller --all-targets --all-features -- -D warnings
+RUN cargo test -p man_down_core -p man_down_poller
+RUN cargo build --release -p man_down_poller
+
+FROM alpine
+
+RUN apk update && apk add --no-cache libgcc openssl
+
+COPY --from=builder /build/target/release/man_down_poller /man_down_poller
+
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
+COPY config.yaml ./
+
+USER appuser:appuser
+
+ENTRYPOINT [ "/man_down_poller" ]
