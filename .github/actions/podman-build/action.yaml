@@ -1,0 +1,116 @@
+name: Podman Build Container
+description: Build and optionally push a container with Podman
+
+inputs:
+  containerfile:
+    description: Path to the Containerfile
+    required: true
+  image_name:
+    description: Image name without registry or tag (e.g. mandown-poller)
+    required: true
+  tag:
+    description: Image tag. If empty, uses the workspace version from Cargo.toml
+    required: false
+    default: ''
+  push:
+    description: Whether to push the image to Artifact Registry
+    required: false
+    default: 'false'
+  github_variable:
+    description: If set after a push, update this GitHub Actions variable with the image name
+    required: false
+    default: ''
+  repository_uri:
+    description: Artifact Registry repository URI
+    required: true
+  registry_uri:
+    description: Artifact Registry host URI
+    required: true
+  gcp_project_id:
+    description: GCP project ID
+    required: true
+  gcp_wif:
+    description: GCP workload identity provider
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve image tag
+      id: tag
+      shell: bash
+      env:
+        TAG_INPUT: ${{ inputs.tag }}
+        IMAGE_NAME: ${{ inputs.image_name }}
+        PUSH: ${{ inputs.push }}
+        REPOSITORY_URI: ${{ inputs.repository_uri }}
+      run: |
+        if [ -n "$TAG_INPUT" ]; then
+          tag="$TAG_INPUT"
+        else
+          tag=$(grep "^version = " Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+        fi
+
+        if [ "$PUSH" = "true" ]; then
+          image="${REPOSITORY_URI}/${IMAGE_NAME}:${tag}"
+        else
+          image="${IMAGE_NAME}:${tag}"
+        fi
+
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        echo "image=$image" >> "$GITHUB_OUTPUT"
+        echo "cache_image=${REPOSITORY_URI}/${IMAGE_NAME}-buildcache" >> "$GITHUB_OUTPUT"
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v3
+      with:
+        create_credentials_file: 'true'
+        project_id: ${{ inputs.gcp_project_id }}
+        workload_identity_provider: ${{ inputs.gcp_wif }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v3
+      with:
+        install_components: gcloud
+        project_id: ${{ inputs.gcp_project_id }}
+
+    - name: Install Podman
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y podman
+
+    - name: Authenticate Podman to Artifact Registry
+      shell: bash
+      env:
+        REGISTRY_URI: ${{ inputs.registry_uri }}
+      run: |
+        gcloud auth print-access-token | podman login -u oauth2accesstoken --password-stdin "$REGISTRY_URI"
+
+    - name: Build container
+      shell: bash
+      env:
+        IMAGE: ${{ steps.tag.outputs.image }}
+        CACHE_IMAGE: ${{ steps.tag.outputs.cache_image }}
+        CONTAINERFILE: ${{ inputs.containerfile }}
+        PUSH: ${{ inputs.push }}
+      run: |
+        podman build \
+          --layers \
+          --cache-from "$CACHE_IMAGE" \
+          --cache-to "$CACHE_IMAGE" \
+          -f "$CONTAINERFILE" \
+          -t "$IMAGE" .
+
+        if [ "$PUSH" = "true" ]; then
+          podman push "$IMAGE"
+        fi
+
+    - name: Set image variable
+      if: inputs.push == 'true' && inputs.github_variable != ''
+      shell: bash
+      env:
+        IMAGE: ${{ steps.tag.outputs.image }}
+        GITHUB_VARIABLE: ${{ inputs.github_variable }}
+      run: |
+        gh variable set "$GITHUB_VARIABLE" -b "$IMAGE"

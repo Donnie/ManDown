@@ -5,29 +5,27 @@ on:
     branches:
       - main
     paths:
-      - '.containerignore'
-      - 'Cargo.lock'
-      - 'Cargo.toml'
-      - 'config.yaml'
-      - 'crates/**'
-    types: [opened, synchronize, reopened]
+      - '**'
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 jobs:
   check-semver:
+    name: Check Semver
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.ref }}
 
-      - name: Install Rust toolchain
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
 
       - name: Get base version
         id: base
@@ -47,14 +45,14 @@ jobs:
             BASE_VERSION=${LATEST_TAG#v}
             echo "Base version from latest tag: $BASE_VERSION"
           fi
-          echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
+          echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Get head version
         id: head
         run: |
-          HEAD_VERSION=$(grep '^version = ' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
+          HEAD_VERSION=$(grep '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
           echo "Head version from Cargo.toml: $HEAD_VERSION"
-          echo "head_version=$HEAD_VERSION" >> $GITHUB_OUTPUT
+          echo "head_version=$HEAD_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Auto-increment patch version if needed
         id: auto-increment
@@ -73,7 +71,7 @@ jobs:
           if ! ([ "$head_major" -gt "$base_major" ] || \
                 ([ "$head_major" -eq "$base_major" ] && [ "$head_minor" -gt "$base_minor" ]) || \
                 ([ "$head_major" -eq "$base_major" ] && [ "$head_minor" -eq "$base_minor" ] && [ "$head_patch" -gt "$base_patch" ])); then
-            
+
             echo "HEAD version ($HEAD_VERSION) is not ahead of BASE version ($BASE_VERSION)."
 
             # Increment patch version based on BASE
