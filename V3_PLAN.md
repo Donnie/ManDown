@@ -41,7 +41,7 @@ State lives in **Firestore (MongoDB-compatible API)**, collection `mandown.websi
 
 ### Target shape
 
-Split into **two binaries** that share the same crate (lib + bins), each a natural fit for serverless:
+Split into a **Cargo workspace** of three crates — one shared lib (`core`) and two binaries — each a natural fit for serverless:
 
 | Binary | Trigger | Lifetime | Cloud Run shape |
 |---|---|---|---|
@@ -52,89 +52,194 @@ Firestore, the `mongodb` crate, Artifact Registry, and most of the Rust code are
 
 ---
 
-## 2. Splitting the binary
+## 2. Splitting the binary — Cargo workspace (3 crates)
 
-### 2.1 Crate layout: lib + three bins
+Convert the single-binary crate into a **Cargo workspace** with one shared library crate and two binary crates. Each binary compiles only the dependencies it actually needs (the poller never links `axum` or teloxide's webhook feature; the bot never links the poll-loop logic). There is no combined dev binary — local dev runs `cargo run -p man_down_bot` (webhook mode, pointed at `ngrok`) or `cargo run -p man_down_poller` (one sweep).
 
-Convert the single-binary crate into a **library + binaries** so the bins share `src/poll.rs`, `src/mongo.rs`, `src/http.rs`, etc. without duplicating code.
+> **Built in two phases (see Section 7):** Phase 1 creates the workspace with `crates/core` + `crates/poller` only; Phase 2 adds `crates/bot` as the third member. The end-state layout below shows all three.
 
-Proposed layout:
+### 2.1 Workspace layout
 
 ```
-src/
-├── lib.rs            # NEW: declares pub mod ...; re-exports shared API
-├── main.rs           # KEPT: local-dev combined mode (long polling + loop), unchanged
-├── bin/
-│   ├── bot.rs        # NEW: webhook bot entrypoint (prod)
-│   └── poller.rs     # NEW: one-shot poller entrypoint (prod)
-├── alert.rs          # unchanged
-├── baseline.rs       # unchanged
-├── command.rs        # refactored: expose handler for webhook dispatch
-├── config.rs         # unchanged
-├── format.rs         # unchanged
-├── handler.rs        # unchanged
-├── http.rs           # unchanged
-├── mongo.rs          # unchanged
-├── parse_url.rs      # unchanged
-└── poll.rs           # refactored: extract run_once()
+Cargo.toml                  # workspace root (no [dependencies])
+crates/
+├── core/                   # shared lib: model, DB init, HTTP client, alert formatter, logger
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── mongo.rs        # Website struct + init_mongo (shared)
+│       ├── http.rs        # cust_client + HttpClient trait + get_status_code (shared)
+│       ├── alert.rs       # process() (shared)
+│       └── config.rs      # init_logger (shared)
+├── bot/                    # webhook bot (prod)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── main.rs
+│       ├── command.rs      # bot-only
+│       ├── handler.rs     # bot-only
+│       ├── format.rs      # bot-only
+│       ├── parse_url.rs   # bot-only
+│       └── mongo.rs       # put_site, get_user_websites, clear/delete (bot-only)
+└── poller/                 # one-shot poller (prod)
+    ├── Cargo.toml
+    └── src/
+        ├── main.rs
+        ├── poll.rs         # run_once() (poller-only)
+        ├── baseline.rs    # poller-only
+        ├── alert.rs       # alert_users() (poller-only)
+        ├── http.rs        # get_status(), find_changed_websites() (poller-only)
+        ├── mongo.rs       # get_sites(), update_db() (poller-only)
+        └── config.rs      # Config (baseline_sites loader) (poller-only)
 ```
 
-### 2.2 `Cargo.toml` changes
+### 2.2 What's shared vs. bot-only vs. poller-only
 
-Add a `[lib]` and explicit `[[bin]]` targets, and the `webhook` feature for `teloxide` plus `axum` for the HTTP listener:
+| Module | Location | Why |
+|---|---|---|
+| `mongo::Website` struct, `mongo::init_mongo` | `core` | Both crates init the same Firestore connection and use the same document model |
+| `http::cust_client`, `http::HttpClient` trait, `http::get_status_code` | `core` | Bot uses `get_status_code` for `/track` validation; poller uses it for the sweep |
+| `alert::process` | `core` | Status→message formatter; bot calls it in `handle_track`, poller calls it in `alert_users` |
+| `config::init_logger` | `core` | Both binaries bootstrap logging identically |
+| `command`, `handler`, `format`, `parse_url` | `bot` | Telegram command parsing + `/track` `/list` `/clear` `/untrack` only |
+| `mongo::put_site`, `get_user_websites`, `clear_user_websites`, `delete_sites_by_hostname` | `bot` | User-facing writes/reads only the bot performs |
+| `axum`, `teloxide` `webhook` feature | `bot` | Only the bot runs an HTTP listener |
+| `poll`, `baseline` | `poller` | Sweep loop + baseline connectivity check |
+| `mongo::get_sites`, `mongo::update_db` | `poller` | Paginated reads + status updates only the poller performs |
+| `http::get_status` (retry), `http::find_changed_websites` | `poller` | Sweep-only helpers |
+| `alert::alert_users` | `poller` | Sends alerts to users |
+| `config::Config` (loads `baseline_sites` from YAML) | `poller` | Only the poller reads `config.yaml` |
+
+> The existing modules keep their `crate::` internal paths — they resolve correctly inside whichever crate they live in. The binaries reference shared code as `man_down_core::{...}`.
+
+### 2.3 Workspace root `Cargo.toml`
+
+Replace the current single-crate `Cargo.toml` with:
 
 ```toml
-[lib]
-name = "man_down"
-path = "src/lib.rs"
+[workspace]
+members  = ["crates/core", "crates/bot", "crates/poller"]
+resolver = "2"
 
-[[bin]]
-name = "man_down"          # local-dev combined binary (kept for `cargo run`)
-path = "src/main.rs"
-
-[[bin]]
-name = "man_down_bot"      # prod webhook bot
-path = "src/bin/bot.rs"
-
-[[bin]]
-name = "man_down_poller"   # prod one-shot poller
-path = "src/bin/poller.rs"
+[workspace.package]
+version = "2.1.6"
+edition  = "2024"
 ```
 
-Dependencies diff:
+Keeping the version in `[workspace.package]` lets all three crates share one version number; bump it once and CI updates everywhere.
+
+### 2.4 `crates/core/Cargo.toml`
 
 ```toml
+[package]
+name = "man_down_core"
+version.workspace = true
+edition.workspace  = true
+
+[dependencies]
+async-trait = "0.1"
+chrono = "0.4"
+log = "0.4"
+mongodb = "3.8.0"
+reqwest = { version = "0.11.4", features = ["json"] }
+serde = "1.0.130"
+serde_derive = "1.0.130"
+serde_yaml = "0.9"
+url = "2.2"
+```
+
+### 2.5 `crates/bot/Cargo.toml`
+
+```toml
+[package]
+name = "man_down_bot"
+version.workspace = true
+edition.workspace  = true
+
+[dependencies]
+man_down_core = { path = "../core" }
+async-trait = "0.1"
+chrono = "0.4"
+dotenvy = "0.15"
+env_logger = "0.11"
+futures = "0.3.28"
+log = "0.4"
+mongodb = "3.8.0"
+reqwest = { version = "0.11.4", features = ["json"] }
+serde = "1.0.130"
 teloxide = { version = "0.12", features = ["auto-send", "macros", "webhook"] }
+tokio = { version = "1.8.3", features = ["full"] }
+url = "2.2"
 axum = "0.7"
 ```
 
-> Verify the exact `webhook` feature name against the teloxide 0.12 docs; if the feature is named differently in your lockfile, adjust accordingly. The `axum` integration is what teloxide's webhook listener is built on.
+> Verify the exact `webhook` feature name against the teloxide 0.12 docs; if it's named differently in your lockfile, adjust accordingly. `axum` is what teloxide's webhook listener is built on.
 
-### 2.3 `src/lib.rs` (new)
+### 2.6 `crates/poller/Cargo.toml`
 
-Re-export the modules so binaries can `use man_down::{...}`:
+```toml
+[package]
+name = "man_down_poller"
+version.workspace = true
+edition.workspace  = true
+
+[dependencies]
+man_down_core = { path = "../core" }
+chrono = "0.4"
+dotenvy = "0.15"
+env_logger = "0.11"
+futures = "0.3.28"
+log = "0.4"
+mongodb = "3.8.0"
+reqwest = { version = "0.11.4", features = ["json"] }
+serde_yaml = "0.9"
+teloxide = { version = "0.12", features = ["auto-send", "macros"] }
+tokio = { version = "1.8.3", features = ["full"] }
+```
+
+Note: **no `axum`, no `webhook` feature** — the poller only sends messages via `bot.send_message`, it never runs an HTTP server. This keeps the poller binary substantially smaller.
+
+### 2.7 `crates/core/src/lib.rs`
 
 ```rust
 pub mod alert;
-pub mod baseline;
-pub mod command;
 pub mod config;
-pub mod format;
-pub mod handler;
 pub mod http;
 pub mod mongo;
-pub mod parse_url;
-pub mod poll;
 ```
 
-The existing modules keep their `crate::` internal paths — those resolve correctly inside the lib crate. The only changes are: `main.rs` and the two new bins reference `man_down::` instead of `crate::`.
+Only the four genuinely shared modules live here. `alert` exposes `process()` (shared); `alert_users()` moves to the poller crate. `mongo` exposes the `Website` struct + `init_mongo()` (shared); the user-facing and sweep-specific query functions move to their respective binary crates.
 
-### 2.4 `src/poll.rs` — extract `run_once()`
-
-Today `downtime_check` is a `loop` that calls the sweep then sleeps. Extract one iteration so the poller binary can call it once and exit. The existing `start_downtime_checker` (used by `main.rs` for local dev) is kept unchanged.
+### 2.8 `crates/poller/src/main.rs` (new, prod)
 
 ```rust
-// src/poll.rs (refactored, sketch)
+use man_down_core::{config::init_logger, http::cust_client, mongo::init_mongo};
+use teloxide::prelude::*;
+
+mod alert;       // alert_users() — poller-only
+mod baseline;
+mod config;      // Config (baseline_sites loader) — poller-only
+mod http;        // get_status(), find_changed_websites() — poller-only
+mod mongo;       // get_sites(), update_db() — poller-only
+mod poll;        // run_once()
+
+#[tokio::main]
+async fn main() {
+    dotenvy::dotenv().ok();
+    init_logger();
+
+    let collection = init_mongo().await;
+    let http_client = cust_client(30);
+    let bot = Bot::from_env();
+
+    poll::run_once(&collection, bot, http_client).await;
+    // exit 0 — Cloud Run scales the instance back to zero
+}
+```
+
+`poll::run_once()` is the extracted single iteration (no loop, no sleep):
+
+```rust
+// crates/poller/src/poll.rs (sketch)
 pub async fn run_once(
     collection: &Collection<Document>,
     bot: Bot,
@@ -147,41 +252,20 @@ pub async fn run_once(
 }
 ```
 
-`downtime_check` becomes `loop { run_once(...).await; sleep(interval).await; }` — same behavior, no functional change for local dev.
+### 2.9 `crates/bot/src/main.rs` (new, prod) — webhook mode
 
-### 2.5 `src/bin/poller.rs` (new, prod)
-
-```rust
-use man_down::{config::init_logger, http::cust_client, mongo::init_mongo, poll::run_once};
-use teloxide::prelude::*;
-
-#[tokio::main]
-async fn main() {
-    dotenvy::dotenv().ok();
-    init_logger();
-
-    let collection = init_mongo().await;
-    let http_client = cust_client(30);
-    let bot = Bot::from_env();
-
-    run_once(&collection, bot, http_client).await;
-    // exit 0 — Cloud Run scales the instance back to zero
-}
-```
-
-No loop, no sleep. Cloud Scheduler invokes this service every `FREQ` seconds.
-
-### 2.6 `src/bin/bot.rs` (new, prod) — webhook mode
-
-Switch from `Command::repl` (long polling) to a webhook listener. The command-handling logic in `src/command.rs` (`answer()`) is reused as-is — only the dispatch source changes.
+Switch from `Command::repl` (long polling) to a webhook listener. The command-handling logic (`answer()`) is reused as-is — only the dispatch source changes.
 
 ```rust
-use man_down::command;
-use man_down::config::init_logger;
-use man_down::http::cust_client;
-use man_down::mongo::init_mongo;
+use man_down_core::{config::init_logger, http::cust_client, mongo::init_mongo};
 use std::sync::Arc;
 use teloxide::prelude::*;
+
+mod command;    // answer() + webhook dispatch handler
+mod format;
+mod handler;
+mod mongo;      // put_site, get_user_websites, clear_user_websites, delete_sites_by_hostname
+mod parse_url;
 
 #[tokio::main]
 async fn main() {
@@ -214,18 +298,18 @@ async fn main() {
 }
 ```
 
-> The exact `teloxide::update_listener::webhooks::axum` signature and the `dispatch_with_listener` API should be verified against the teloxide 0.12 docs / examples — the shape above is the idiomatic pattern, but minor method names may differ in your version. The key point: replace `Command::repl` with a webhook `UpdateListener` and reuse the existing `answer()` logic as the per-update handler.
+> The exact `teloxide::update_listener::webhooks::axum` signature and `dispatch_with_listener` API should be verified against the teloxide 0.12 docs / examples — the shape above is the idiomatic pattern, but minor method names may differ in your version. The key point: replace `Command::repl` with a webhook `UpdateListener` and reuse the existing `answer()` logic as the per-update handler.
 
-### 2.7 `src/command.rs` — expose a handler for webhook dispatch
+### 2.10 `crates/bot/src/command.rs` — expose a handler for webhook dispatch
 
 Today `start_command` owns the `Command::repl` loop. Extract the per-update logic so the webhook dispatcher can call it. `Command::repl` internally parses `/cmd args` from a `Message`; in webhook mode we do the same parse on each incoming `Update`:
 
 ```rust
-// src/command.rs (refactored, sketch)
+// crates/bot/src/command.rs (refactored, sketch)
 use teloxide::prelude::*;
 use teloxide::utils::command::BotCommands;
 
-// Reusable handler used by both long-poll (main.rs) and webhook (bin/bot.rs)
+// Reusable handler used by the webhook dispatcher
 pub async fn handle_update(
     bot: Bot,
     update: Update,
@@ -238,24 +322,49 @@ pub async fn handle_update(
 }
 ```
 
-The existing `answer()` function is unchanged — only the loop around it changes. `start_command` (used by `main.rs` for local dev) stays as the `Command::repl` wrapper.
+The existing `answer()` function is unchanged — only the loop around it is removed. There is no long-polling `start_command` in prod; local dev runs the bot in webhook mode (point `WEBHOOK_URL` at an `ngrok` tunnel) or runs the poller for a single sweep.
 
-### 2.8 `src/main.rs` — unchanged (local dev)
+### 2.11 Dockerfile — build and ship both prod binaries
 
-Keep `src/main.rs` exactly as it is so `cargo run` and `cargo run --bin man_down` still work for local development with long polling + the in-process poll loop. Only the prod deployment uses the two new binaries.
-
-### 2.9 Dockerfile — build and ship both prod binaries
-
-The current Dockerfile builds one binary (`man_down`). Change the final stage to copy both prod binaries and default to the bot:
+The current Dockerfile builds one binary (`man_down`). With a workspace, `cargo build --release` builds all members. Change the final stage to copy both prod binaries and default to the bot:
 
 ```dockerfile
+############################
+# STEP 1 build (workspace)
+############################
+FROM rust:alpine AS builder
+RUN apk update && apk add --no-cache pkgconfig musl-dev openssl-dev
+ENV RUSTFLAGS='-C target-feature=-crt-static'
+
+WORKDIR /build
+RUN rustup component add rustfmt clippy
+
+# Copy the whole workspace (manifests first for layer caching)
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+
+# Create stub sources to prebuild dependencies
+RUN mkdir -p crates/core/src crates/bot/src crates/poller/src && \
+    echo 'pub fn _stub() {}' > crates/core/src/lib.rs && \
+    echo 'fn main() {}' > crates/bot/src/main.rs && \
+    echo 'fn main() {}' > crates/poller/src/main.rs && \
+    cargo build --release
+
+# Copy real sources over the stubs and build the real binaries
+COPY crates/ crates/
+RUN cargo fmt --all -- --check
+RUN cargo clippy --all-targets --all-features -- -D warnings
+RUN cargo test
+RUN cargo build --release
+
+############################
+# STEP 2 small runtime image
+############################
 FROM alpine
 RUN apk update && apk add --no-cache libgcc openssl
 
 COPY --from=builder /build/target/release/man_down_bot    /mandown_bot
 COPY --from=builder /build/target/release/man_down_poller /mandown_poller
-COPY --from=builder /etc/passwd /etc/passwd
-COPY --from=builder /etc/group  /etc/group
 COPY config.yaml ./
 
 USER appuser:appuser
@@ -265,9 +374,7 @@ ENV ENTRYPOINT_BIN=/mandown_bot
 ENTRYPOINT [ "sh", "-c", "exec ${ENTRYPOINT_BIN}" ]
 ```
 
-The build stage already runs `cargo build --release`, which produces all three binaries. The poller Cloud Run service overrides the entrypoint to `/mandown_poller`.
-
-> Continued in next section.
+The poller Cloud Run service overrides the entrypoint to `/mandown_poller`. `config.yaml` is only read by the poller; bundling it once keeps the image shared.
 
 ---
 
@@ -310,7 +417,10 @@ To stop receiving updates (e.g. during cutover), call `deleteWebhook`.
 
 ### 3.5 Local development
 
-Keep `src/main.rs` (long polling + loop) for local dev so you don't need a public URL or ngrok. Only prod runs `man_down_bot` in webhook mode. If you want to test webhooks locally, use `ngrok http 8080` and point `WEBHOOK_URL` at the ngrok tunnel.
+There is no combined dev binary. Run the bot and poller separately:
+
+- **Bot:** `cargo run -p man_down_bot` in webhook mode. Point `WEBHOOK_URL` at an `ngrok http 8080` tunnel so Telegram can reach your local machine.
+- **Poller:** `cargo run -p man_down_poller` runs **one** sweep and exits — run it manually whenever you want to test the sweep locally.
 
 ---
 
@@ -526,24 +636,61 @@ Unchanged in shape — just applies the new config. The `terraform plan` on PRs 
 
 ### 6.3 `.github/workflows/pr-test.yaml`
 
-Unchanged. `cargo fmt`, `cargo clippy`, `cargo build`, `cargo test` now build all three binaries; tests are unaffected.
+Unchanged. `cargo fmt`, `cargo clippy`, `cargo build`, `cargo test` now build all workspace members (core + bot + poller); tests are unaffected.
 
 ---
 
-## 7. Migration / cutover steps
+## 7. Migration — phased rollout
+
+The migration is split into **two phases** so the poller can be validated in production before touching the bot. The GCE VM keeps serving users throughout Phase 1; it is only torn down in Phase 2, immediately after the webhook bot takes over.
+
+> **Note on overlap:** during Phase 1 the VM's in-process poll loop and the new Cloud Run poller will both run, so users may receive duplicate alerts until Phase 2 completes. This is accepted — no bridge patch or VM silencing is needed, which keeps Phase 1 purely additive.
+
+---
+
+### 7.1 Phase 1 — poller + scheduler (low risk, additive)
+
+**Goal:** deploy the poller on Cloud Run + Cloud Scheduler and validate it in prod for several days. The VM continues to run unchanged (long-polling bot + its own poll loop) the entire time.
 
 1. **Back up Firestore** — `gcloud firestore export gs://state-mandown/backup-$(date +%s)`.
-2. **Implement the code changes** (Section 2) — lib + two bins, `run_once()`, webhook listener. Verify `cargo build --release` produces `man_down`, `man_down_bot`, `man_down_poller`.
-3. **Deploy new Terraform** (Section 5) alongside the existing GCE VM. Cloud Run services come up empty (no traffic yet). Create the Secret Manager secrets and versions.
-4. **Push the new image** to Artifact Registry (via a staging tag, not a release tag yet).
-5. **Deploy to Cloud Run** from the staging image.
-6. **Smoke test with a staging bot token** (create a second bot via BotFather, set its `WEBHOOK_URL` to the Cloud Run bot URL). Send `/track example.com`, `/list`, `/untrack example.com` — verify Firestore gets the right documents.
-7. **Smoke test the poller** — `curl -X POST <poller-url>` manually; verify it sweeps and alerts the staging bot.
-8. **Enable the Cloud Scheduler job.** Verify it fires every 10 min.
-9. **Cut over the production bot** — call `setWebhook` for the production token pointing at the Cloud Run bot URL. The old GCE VM's long polling stops receiving updates immediately (Telegram sends updates to only one webhook/polling consumer).
-10. **Observe for one poll cycle** — confirm alerts fire from the new poller.
-11. **Destroy the GCE VM** — `terraform destroy -target=google_compute_instance.mandown` (or remove `compute.tf` and apply).
-12. **Monitor for one week** — Cloud Run logs, Firestore quota, Scheduler job success rate.
+2. **Restructure the repo into a workspace** with two members: `crates/core` + `crates/poller` (the `crates/bot` member is added in Phase 2). Move shared modules into `core`, poller-only modules into `poller`, per Section 2. Extract `poll::run_once()`. Verify `cargo build --release -p man_down_poller` succeeds.
+3. **Deploy Phase-1 Terraform** (alongside the VM): `infra/cloudrun.tf` (poller service only), `infra/scheduler.tf`, `infra/secrets.tf`. Do **not** touch `compute.tf`. Create the Secret Manager secrets + versions for `TELOXIDE_TOKEN` and `MONGODB_URI`.
+4. **Build + push the poller image**, deploy to the `mandown-poller` Cloud Run service.
+5. **Smoke test the poller** — `curl -X POST <poller-url>` once manually; confirm in Cloud Run logs that it sweeps all sites, detects status changes, and sends Telegram alerts.
+6. **Enable the Cloud Scheduler job** (`*/10 * * * *`). Confirm it fires on schedule.
+7. **Observe for 3–7 days.** Confirm: the Cloud Run poller fires reliably, Firestore quota stays in free tier, Scheduler job success rate is 100%. (Duplicate alerts from the VM's poller are expected during this window and stop in Phase 2.) Fix anything that surfaces before moving to Phase 2.
+
+**Exit criteria for Phase 1:** the Cloud Run poller + Scheduler are validated and reliable. The VM is untouched.
+
+---
+
+### 7.2 Phase 2 — webhook bot + VM teardown (fast, coordinated cutover)
+
+**Goal:** replace the VM's long-polling bot with the Cloud Run webhook bot, then destroy the VM. This phase is done in a single short window because the cutover is atomic: once `setWebhook` is called for the production token, Telegram stops sending updates to the VM's long-polling connection immediately — which also ends the VM's duplicate poller alerts.
+
+1. **Add `crates/bot` to the workspace** (3rd member). Implement the webhook listener, refactor `command.rs` to expose `handle_update()`, move bot-only modules into the crate, per Section 2. Verify `cargo build --release` produces `man_down_bot`.
+2. **Deploy Phase-2 Terraform**: add the `mandown-bot` Cloud Run service to `infra/cloudrun.tf` (+ IAM for unauthenticated ingress). The VM is still running.
+3. **Build + push the image** (now contains both `man_down_bot` and `man_down_poller`), deploy the bot service to Cloud Run.
+4. **Smoke test with a staging bot token** (create a second bot via BotFather, set its webhook to the Cloud Run bot URL). Send `/track example.com`, `/list`, `/untrack example.com` — verify Firestore gets the right documents and responses come from Cloud Run, not the VM.
+5. **Cutover (the atomic step):** call `setWebhook` for the **production** token, pointing at the Cloud Run bot URL. Within seconds the VM's `getUpdates` long-poll returns no more updates — Telegram delivers to exactly one consumer (webhook wins over polling). The VM is now inert, and its poll loop's duplicate alerts stop too.
+6. **Verify the production bot** — send `/list` from a real Telegram account; confirm the response comes from Cloud Run (check logs) and the VM logs show no new updates.
+7. **Destroy the VM** — remove `infra/compute.tf` and `terraform apply` (or `terraform destroy -target=google_compute_instance.mandown`).
+8. **Monitor for one week** — Cloud Run logs for both services, Firestore quota, Scheduler job success rate, alert delivery.
+
+**Exit criteria for Phase 2:** the VM is gone, both Cloud Run services serve all traffic, free-tier quotas hold, no duplicate alerts.
+
+---
+
+### 7.3 Why phasing is safer
+
+| Risk | Big-bang cutover | Phased |
+|---|---|---|
+| Poller bug doubles or misses alerts | Discovered during cutover, users affected | Discovered in Phase 1 over days, VM still serving |
+| Webhook misconfig drops bot updates | Bot down until fixed | Bot never down — VM serves until `setWebhook` succeeds |
+| VM teardown window | Must happen same day as webhook deploy | Decoupled — VM stays as long as you want |
+| Rollback | Revert image + re-poll Telegram | Phase 1 rollback = disable the Scheduler job; Phase 2 rollback = `deleteWebhook` (VM long polling resumes) |
+
+Phase 2 is intentionally a short, coordinated window (steps 5–7 are minutes apart), but it only happens after Phase 1 has de-risked the harder half (the poller). The accepted cost is duplicate alerts during Phase 1, which end the moment Phase 2's `setWebhook` cutover makes the VM inert.
 
 ---
 
@@ -553,7 +700,7 @@ Unchanged. `cargo fmt`, `cargo clippy`, `cargo build`, `cargo test` now build al
 - **Cold-start latency** — `min-instances=0` adds ~1–2s to the first `/track` after idle. Acceptable for a personal bot. If not, set `min-instances=1` (≈ $5/mo, no longer free).
 - **Poller overlap** — Cloud Scheduler could fire the next run before the previous finishes. With `FREQ=600s` and a ~30s sweep this is unlikely, but guard with a Firestore "lock" doc: CAS on `last_poll_started_at`, skip if `now - last < FREQ - epsilon`.
 - **Poller as service vs. job** — this plan uses a Cloud Run **service** invoked by HTTP POST (simplest). A Cloud Run **Job** is also possible but requires the Scheduler to call the Jobs execute API with OIDC, which is more plumbing. The HTTP-service approach is recommended.
-- **teloxide webhook API** — verify the exact `webhooks::axum` and `dispatch_with_listener` signatures against teloxide 0.12 docs before finalizing `src/bin/bot.rs`.
+- **teloxide webhook API** — verify the exact `webhooks::axum` and `dispatch_with_listener` signatures against teloxide 0.12 docs before finalizing `crates/bot/src/main.rs`.
 - **Secret rotation** — `MONGODB_URI` and `TELOXIDE_TOKEN` move from GCE container env to Secret Manager. Update the GitHub Actions secrets accordingly (or keep them as WIF-injected env at deploy time).
 - **`ENV` and `FREQ` on the bot** — `ENV` is unused in code; `FREQ` is only read by the poll loop, which the bot no longer runs. The poller reads `FREQ` only if you keep the loop in `run_once` — you don't, so `FREQ` becomes a Terraform/Scheduler-only concept (the cron schedule replaces it).
 
@@ -561,22 +708,42 @@ Unchanged. `cargo fmt`, `cargo clippy`, `cargo build`, `cargo test` now build al
 
 ## 9. Effort estimate
 
-| Phase | Hours |
+### Phase 1 — poller + scheduler
+
+| Task | Hours |
 |---|---|
-| Code: lib + 2 bins, `run_once()`, webhook listener, `command.rs` refactor | ~5 |
-| Dockerfile update (ship both binaries) | ~0.5 |
-| Terraform: delete VM, add Cloud Run + Scheduler + Secrets | ~3 |
-| GitHub Actions: deploy commands + new vars | ~1 |
-| Cutover + smoke test (staging token) | ~2 |
-| **Total** | **~11.5** |
+| Workspace split: `crates/core` + `crates/poller`, extract `run_once()`, move modules | ~2.5 |
+| Dockerfile update (build workspace, ship poller binary) | ~0.5 |
+| Terraform: Cloud Run poller service + Scheduler + Secrets (VM untouched) | ~1.5 |
+| GitHub Actions: poller deploy step | ~0.5 |
+| Smoke test + enable Scheduler + 3–7 day observation | ~1 (active) |
+| **Phase 1 subtotal** | **~6** |
+
+### Phase 2 — webhook bot + VM teardown
+
+| Task | Hours |
+|---|---|
+| Add `crates/bot` to workspace, webhook listener, `command.rs` refactor, move bot-only modules | ~2.5 |
+| Terraform: add `mandown-bot` Cloud Run service + IAM | ~1 |
+| GitHub Actions: bot deploy step + `WEBHOOK_URL` var | ~0.5 |
+| Staging-token smoke test + atomic cutover (`setWebhook`) + VM destroy | ~1.5 |
+| One-week monitor | ~0.5 (active) |
+| **Phase 2 subtotal** | **~6** |
+
+| | |
+|---|---|
+| **Total** | **~12** |
+
+The accepted cost of skipping a bridge patch is duplicate alerts to users during the Phase 1 observation window (a few days). That ends the moment Phase 2's `setWebhook` cutover makes the VM inert.
 
 ---
 
 ## 10. Summary
 
-- **One crate, three binaries**: keep `man_down` (local dev, long polling + loop), add `man_down_bot` (prod, webhook) and `man_down_poller` (prod, one-shot sweep).
+- **Cargo workspace, three crates (built in two phases)**: `man_down_core` (shared: `Website` model, `init_mongo`, HTTP client, `process()` formatter, logger), `man_down_poller` (Phase 1, one-shot sweep — no `axum`, no webhook feature), `man_down_bot` (Phase 2, webhook — pulls `axum` + teloxide `webhook`). No combined dev binary; local dev runs each crate separately.
 - **Telegram**: long polling → webhooks via teloxide's `webhook` feature + `axum`; Cloud Run's HTTPS URL is the webhook target.
 - **Poller**: in-process `loop { sleep }` → Cloud Scheduler HTTP trigger; the poller runs one sweep and exits.
-- **State**: Firestore + `mongodb` crate, completely unchanged.
-- **Infra**: delete GCE VM, add two Cloud Run services + one Cloud Scheduler job + Secret Manager secrets; keep Firestore and Artifact Registry.
+- **State**: Firestore + `mongodb` crate, completely unchanged (Enterprise edition + MongoDB-compatible API stays; fits the Enterprise daily free tier).
+- **Phased rollout**: Phase 1 deploys the poller + Scheduler and validates it for several days while the VM keeps running unchanged (duplicate alerts during the overlap are accepted — no bridge patch needed). Phase 2 deploys the webhook bot, atomically cuts over with `setWebhook` (which also ends the VM's duplicate alerts), and tears down the VM in the same short window.
+- **Infra**: VM destroyed in Phase 2; two Cloud Run services + one Cloud Scheduler job + Secret Manager secrets added across both phases; Firestore and Artifact Registry kept.
 - **Free tier**: stays within Cloud Run / Firestore / Scheduler free quotas with comfortable headroom, as long as `min-instances=0` on both services.
