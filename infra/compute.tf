@@ -1,6 +1,6 @@
 module "container" {
   source  = "terraform-google-modules/container-vm/google"
-  version = "~> 2.0" # Upgrade the version if necessary.
+  version = "3.3.0"
 
   container = {
     image = var.image
