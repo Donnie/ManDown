@@ -4,9 +4,8 @@ on:
   push:
     branches:
       - main
-      - repocleanup
     paths:
-      - '.containerignore'
+      - '.dockerignore'
       - '.github/actions/container-build/**'
       - '.github/workflows/webhook-build-push.yaml'
       - 'Cargo.lock'

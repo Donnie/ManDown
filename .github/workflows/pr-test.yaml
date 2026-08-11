@@ -1,9 +1,6 @@
 name: PR Tests
 
 on:
-  push:
-    branches:
-      - repocleanup
   pull_request:
     branches:
       - main
