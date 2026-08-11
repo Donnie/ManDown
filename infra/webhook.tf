@@ -25,11 +25,6 @@ resource "google_cloud_run_v2_service" "webhook" {
       }
 
       env {
-        name  = "PORT"
-        value = "8080"
-      }
-
-      env {
         name  = "WEBHOOK_URL"
         value = local.webhook_url
       }
