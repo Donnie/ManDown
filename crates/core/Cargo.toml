@@ -1,25 +1,15 @@
-[workspace]
-members = ["crates/core", "crates/poller"]
-resolver = "2"
-
-[workspace.package]
-version = "3.0.0"
-edition = "2024"
-
 [package]
-name = "man_down"
+name = "man_down_core"
 version.workspace = true
 edition.workspace = true
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 async-trait = "0.1"
 chrono = "0.4"
 dotenvy = "0.15"
 env_logger = "0.11"
-log = "0.4"
 futures = "0.3.28"
+log = "0.4"
 mongodb = "3.8.0"
 reqwest = { version = "0.11.4", features = ["blocking", "json"] }
 serde = "1.0.130"

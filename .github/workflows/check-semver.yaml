@@ -11,6 +11,8 @@ on:
       - 'config.yaml'
       - 'diesel.toml'
       - 'Dockerfile'
+      - 'crates/poller/Containerfile'
+      - 'crates/**'
       - 'migrations/**'
       - 'src/**'
     types: [opened, synchronize, reopened]
@@ -87,7 +89,7 @@ jobs:
             sed -i "s/^version = .*/version = \"$NEW_VERSION\"/" Cargo.toml
             
             # Update Cargo.lock with new version
-            cargo update --package man_down
+            cargo update --workspace
 
             # Commit and push the change
             git config --local user.email "github-actions[bot]@users.noreply.github.com"

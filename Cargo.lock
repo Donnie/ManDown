@@ -1383,7 +1383,7 @@ dependencies = [
 
 [[package]]
 name = "man_down"
-version = "2.1.6"
+version = "3.0.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1399,6 +1399,38 @@ dependencies = [
  "teloxide",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "man_down_core"
+version = "3.0.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dotenvy",
+ "env_logger",
+ "futures",
+ "log",
+ "mongodb",
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_yaml",
+ "teloxide",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "man_down_poller"
+version = "3.0.0"
+dependencies = [
+ "dotenvy",
+ "env_logger",
+ "log",
+ "man_down_core",
+ "teloxide",
+ "tokio",
 ]
 
 [[package]]
