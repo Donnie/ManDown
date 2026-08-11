@@ -4,17 +4,12 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - '**/*.rs'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'src/**'
       - 'crates/**'
       - 'config.yaml'
       - 'Dockerfile'
-      - 'crates/poller/Containerfile'
-      - 'tests/**'
-      - 'migrations/**'
-      - 'diesel.toml'
 
 env:
   CARGO_TERM_COLOR: always
@@ -84,6 +79,30 @@ jobs:
         file: crates/poller/Containerfile
         push: false
         tags: mandown-poller:ci
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  webhook-container:
+    name: Build Webhook Container
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: 0
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+    - name: Build webhook container
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: crates/webhook/Containerfile
+        push: false
+        tags: mandown-webhook:ci
         cache-from: type=gha
         cache-to: type=gha,mode=max
 

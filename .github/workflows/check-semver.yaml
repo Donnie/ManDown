@@ -9,11 +9,8 @@ on:
       - 'Cargo.lock'
       - 'Cargo.toml'
       - 'config.yaml'
-      - 'diesel.toml'
       - 'Dockerfile'
-      - 'crates/poller/Containerfile'
       - 'crates/**'
-      - 'migrations/**'
       - 'src/**'
     types: [opened, synchronize, reopened]
 
