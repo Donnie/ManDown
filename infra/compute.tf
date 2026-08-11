@@ -66,4 +66,8 @@ resource "google_compute_instance" "mandown" {
   }
 
   tags = [var.app_name]
+
+  lifecycle {
+    ignore_changes = all
+  }
 }
