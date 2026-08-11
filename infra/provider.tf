@@ -8,7 +8,8 @@ terraform {
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = "6.38.0"
+      # 6.44.0+ fixes empty cleanup_policies sent on update (hashicorp/terraform-provider-google#23486)
+      version = "6.50.0"
     }
     random = {
       source  = "hashicorp/random"
