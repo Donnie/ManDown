@@ -10,11 +10,11 @@ Any change on the status code, for e.g.: 200 -> 500 or 502 -> 404, would be repo
 
 Try it now on: https://t.me/ManDownBot
 
-The bot lives in a Google Compute VM, and the state is stored on Google Firestore.
+The bot runs on Cloud Run (webhook + scheduled poller), and the state is stored on Google Firestore.
 
 Infra Code is in [here](./infra/).
 
-I have been running this bot for more than five years now. The cost is completely covered by Google Free Tier, so it can continue to stay available.
+I have been running this bot for more than five years now (since Jul 2020). The cost is completely covered by Google Free Tier, so it can continue to stay available.
 
 For any kind of uptime guarantees it is best to host it on your cloud account.
 
