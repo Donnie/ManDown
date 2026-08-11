@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/core", "crates/poller"]
+members = ["crates/core", "crates/poller", "crates/webhook"]
 resolver = "2"
 
 [workspace.package]
