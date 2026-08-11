@@ -1,5 +1,5 @@
-name: Podman Build Container
-description: Build and optionally push a container with Podman
+name: Build Container
+description: Build and optionally push a container with Docker Buildx (GitHub Actions cache)
 
 inputs:
   containerfile:
@@ -21,17 +21,21 @@ inputs:
     required: false
     default: ''
   repository_uri:
-    description: Artifact Registry repository URI
-    required: true
+    description: Artifact Registry repository URI (required when push is true)
+    required: false
+    default: ''
   registry_uri:
-    description: Artifact Registry host URI
-    required: true
+    description: Artifact Registry host URI (required when push is true)
+    required: false
+    default: ''
   gcp_project_id:
-    description: GCP project ID
-    required: true
+    description: GCP project ID (required when push is true)
+    required: false
+    default: ''
   gcp_wif:
-    description: GCP workload identity provider
-    required: true
+    description: GCP workload identity provider (required when push is true)
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -48,7 +52,7 @@ runs:
         if [ -n "$TAG_INPUT" ]; then
           tag="$TAG_INPUT"
         else
-          tag=$(grep "^version = " Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          tag=$(grep "^version = " Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
         fi
 
         if [ "$PUSH" = "true" ]; then
@@ -59,9 +63,9 @@ runs:
 
         echo "tag=$tag" >> "$GITHUB_OUTPUT"
         echo "image=$image" >> "$GITHUB_OUTPUT"
-        echo "cache_image=${REPOSITORY_URI}/${IMAGE_NAME}-buildcache" >> "$GITHUB_OUTPUT"
 
     - name: Authenticate to Google Cloud
+      if: inputs.push == 'true'
       uses: google-github-actions/auth@v3
       with:
         create_credentials_file: 'true'
@@ -69,42 +73,32 @@ runs:
         workload_identity_provider: ${{ inputs.gcp_wif }}
 
     - name: Set up Cloud SDK
+      if: inputs.push == 'true'
       uses: google-github-actions/setup-gcloud@v3
       with:
         install_components: gcloud
         project_id: ${{ inputs.gcp_project_id }}
 
-    - name: Install Podman
-      shell: bash
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y podman
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
 
-    - name: Authenticate Podman to Artifact Registry
+    - name: Configure Docker for Artifact Registry
+      if: inputs.push == 'true'
       shell: bash
       env:
         REGISTRY_URI: ${{ inputs.registry_uri }}
       run: |
-        gcloud auth print-access-token | podman login -u oauth2accesstoken --password-stdin "$REGISTRY_URI"
+        gcloud auth configure-docker "$REGISTRY_URI"
 
-    - name: Build container
-      shell: bash
-      env:
-        IMAGE: ${{ steps.tag.outputs.image }}
-        CACHE_IMAGE: ${{ steps.tag.outputs.cache_image }}
-        CONTAINERFILE: ${{ inputs.containerfile }}
-        PUSH: ${{ inputs.push }}
-      run: |
-        podman build \
-          --layers \
-          --cache-from "$CACHE_IMAGE" \
-          --cache-to "$CACHE_IMAGE" \
-          -f "$CONTAINERFILE" \
-          -t "$IMAGE" .
-
-        if [ "$PUSH" = "true" ]; then
-          podman push "$IMAGE"
-        fi
+    - name: Build and push container
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: ${{ inputs.containerfile }}
+        push: ${{ inputs.push }}
+        tags: ${{ steps.tag.outputs.image }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
     - name: Set image variable
       if: inputs.push == 'true' && inputs.github_variable != ''

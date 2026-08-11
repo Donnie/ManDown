@@ -1,6 +1,9 @@
 name: PR Tests
 
 on:
+  push:
+    branches:
+      - repocleanup
   pull_request:
     branches:
       - main
@@ -59,9 +62,6 @@ jobs:
   poller-container:
     name: Build Poller Container
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -70,22 +70,16 @@ jobs:
           fetch-depth: 0
 
       - name: Build poller container
-        uses: ./.github/actions/podman-build
+        uses: ./.github/actions/container-build
         with:
           containerfile: crates/poller/Containerfile
           image_name: mandown-poller
           tag: ci
-          repository_uri: ${{ vars.REPOSITORY_URI }}
-          registry_uri: ${{ vars.REGISTRY_URI }}
-          gcp_project_id: ${{ vars.GCP_PROJECT_ID }}
-          gcp_wif: ${{ vars.GCP_WIF }}
+          push: 'false'
 
   webhook-container:
     name: Build Webhook Container
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -94,15 +88,12 @@ jobs:
           fetch-depth: 0
 
       - name: Build webhook container
-        uses: ./.github/actions/podman-build
+        uses: ./.github/actions/container-build
         with:
           containerfile: crates/webhook/Containerfile
           image_name: mandown-webhook
           tag: ci
-          repository_uri: ${{ vars.REPOSITORY_URI }}
-          registry_uri: ${{ vars.REGISTRY_URI }}
-          gcp_project_id: ${{ vars.GCP_PROJECT_ID }}
-          gcp_wif: ${{ vars.GCP_WIF }}
+          push: 'false'
 
   security-audit:
     name: Security Audit
