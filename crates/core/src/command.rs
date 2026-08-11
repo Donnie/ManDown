@@ -1,8 +1,9 @@
 use crate::handler::{handle_about, handle_clear, handle_list, handle_track, handle_untrack};
 use mongodb::{Collection, bson::Document};
+use std::fmt::Debug;
 use std::sync::Arc;
 use teloxide::prelude::*;
-
+use teloxide::update_listeners::UpdateListener;
 use teloxide::utils::command::BotCommands;
 
 #[derive(BotCommands, Clone)]
@@ -32,12 +33,33 @@ pub async fn start_command(
     collection: Arc<Collection<Document>>,
     client: Arc<reqwest::Client>,
 ) {
-    // Start the bot's command loop
+    // Start the bot's command loop (long polling)
     Command::repl(bot, move |bot, msg, cmd| {
         let collection = collection.clone();
         let client = client.clone();
         async move { answer(bot, msg, cmd, collection, client).await }
     })
+    .await;
+}
+
+pub async fn start_command_with_listener<L>(
+    bot: Bot,
+    collection: Arc<Collection<Document>>,
+    client: Arc<reqwest::Client>,
+    listener: L,
+) where
+    L: UpdateListener + Send,
+    L::Err: Debug + Send,
+{
+    Command::repl_with_listener(
+        bot,
+        move |bot, msg, cmd| {
+            let collection = collection.clone();
+            let client = client.clone();
+            async move { answer(bot, msg, cmd, collection, client).await }
+        },
+        listener,
+    )
     .await;
 }
 

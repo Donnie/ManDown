@@ -1,0 +1,13 @@
+[package]
+name = "man_down_webhook"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+man_down_core = { path = "../core" }
+dotenvy = "0.15"
+env_logger = "0.11"
+log = "0.4"
+teloxide = { version = "0.12", features = ["auto-send", "macros", "webhooks-axum"] }
+tokio = { version = "1.8.3", features = ["full"] }
+url = "2.2"
