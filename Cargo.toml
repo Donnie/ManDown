@@ -1,3 +1,11 @@
+[workspace]
+members = ["crates/core", "crates/poller"]
+resolver = "2"
+
+[workspace.package]
+version = "2.1.6"
+edition = "2024"
+
 [package]
 name = "man_down"
 version = "2.1.6"

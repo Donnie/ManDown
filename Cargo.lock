@@ -1402,6 +1402,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "man_down_core"
+version = "2.1.6"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dotenvy",
+ "env_logger",
+ "futures",
+ "log",
+ "mongodb",
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_yaml",
+ "teloxide",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "man_down_poller"
+version = "2.1.6"
+dependencies = [
+ "dotenvy",
+ "env_logger",
+ "log",
+ "man_down_core",
+ "teloxide",
+ "tokio",
+]
+
+[[package]]
 name = "md-5"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
