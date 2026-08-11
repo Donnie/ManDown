@@ -1,9 +1,6 @@
-data "google_project" "project" {
-}
-
 module "container" {
   source  = "terraform-google-modules/container-vm/google"
-  version = "~> 2.0" # Upgrade the version if necessary.
+  version = "3.3.0"
 
   container = {
     image = var.image
@@ -69,4 +66,8 @@ resource "google_compute_instance" "mandown" {
   }
 
   tags = [var.app_name]
+
+  lifecycle {
+    ignore_changes = all
+  }
 }
