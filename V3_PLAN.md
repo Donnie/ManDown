@@ -324,57 +324,52 @@ pub async fn handle_update(
 
 The existing `answer()` function is unchanged — only the loop around it is removed. There is no long-polling `start_command` in prod; local dev runs the bot in webhook mode (point `WEBHOOK_URL` at an `ngrok` tunnel) or runs the poller for a single sweep.
 
-### 2.11 Dockerfile — build and ship both prod binaries
+### 2.11 Dockerfiles — two independent images, one per binary
 
-The current Dockerfile builds one binary (`man_down`). With a workspace, `cargo build --release` builds all members. Change the final stage to copy both prod binaries and default to the bot:
+Each binary gets its **own self-contained Dockerfile** next to its crate (`crates/poller/Dockerfile`, `crates/bot/Dockerfile`). Each builds the whole workspace and ships only its own binary. This keeps the two images fully independent (the bot image can later grow `axum`/CA-cert runtime deps without touching the poller) at the cost of compiling the dependency tree twice in CI — acceptable since CI/registry layer caching absorbs most of it on subsequent builds.
+
+`crates/poller/Dockerfile`:
 
 ```dockerfile
-############################
-# STEP 1 build (workspace)
-############################
 FROM rust:alpine AS builder
 RUN apk update && apk add --no-cache pkgconfig musl-dev openssl-dev
 ENV RUSTFLAGS='-C target-feature=-crt-static'
-
 WORKDIR /build
 RUN rustup component add rustfmt clippy
 
-# Copy the whole workspace (manifests first for layer caching)
+ENV USER=appuser
+ENV UID=10001
+RUN adduser --disabled-password --gecos "" --home "/nonexistent" \
+    --shell "/sbin/nologin" --no-create-home --uid "${UID}" "${USER}"
+
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
-
-# Create stub sources to prebuild dependencies
-RUN mkdir -p crates/core/src crates/bot/src crates/poller/src && \
-    echo 'pub fn _stub() {}' > crates/core/src/lib.rs && \
-    echo 'fn main() {}' > crates/bot/src/main.rs && \
-    echo 'fn main() {}' > crates/poller/src/main.rs && \
-    cargo build --release
-
-# Copy real sources over the stubs and build the real binaries
-COPY crates/ crates/
-RUN cargo fmt --all -- --check
-RUN cargo clippy --all-targets --all-features -- -D warnings
-RUN cargo test
-RUN cargo build --release
-
-############################
-# STEP 2 small runtime image
-############################
-FROM alpine
-RUN apk update && apk add --no-cache libgcc openssl
-
-COPY --from=builder /build/target/release/man_down_bot    /mandown_bot
-COPY --from=builder /build/target/release/man_down_poller /mandown_poller
 COPY config.yaml ./
 
-USER appuser:appuser
+# Tests + clippy are gated in CI (pr-test.yaml); image build only emits the release binary.
+RUN cargo fmt --all -- --check
+RUN cargo build --release
 
-# Cloud Run sets PORT and invokes the container; default to the bot.
-ENV ENTRYPOINT_BIN=/mandown_bot
-ENTRYPOINT [ "sh", "-c", "exec ${ENTRYPOINT_BIN}" ]
+FROM alpine
+RUN apk update && apk add --no-cache libgcc openssl
+COPY --from=builder /build/target/release/man_down_poller /mandown_poller
+COPY --from=builder /build/config.yaml ./
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group  /etc/group
+USER appuser:appuser
+ENTRYPOINT [ "/mandown_poller" ]
 ```
 
-The poller Cloud Run service overrides the entrypoint to `/mandown_poller`. `config.yaml` is only read by the poller; bundling it once keeps the image shared.
+`crates/bot/Dockerfile` is identical except it copies `/mandown_bot` and **no `config.yaml`** (the webhook bot does not read it; baseline is poller-only).
+
+Build each with its own `-f`:
+
+```bash
+podman build -f crates/poller/Dockerfile -t <registry>/mandown-poller:$TAG .
+podman build -f crates/bot/Dockerfile    -t <registry>/mandown-bot:$TAG .
+```
+
+`.dockerignore` excludes `**/Dockerfile` so the Dockerfiles themselves aren't copied into the image. Phase 1 builds and deploys only the poller image; Phase 2 adds the bot image build + deploy.
 
 ---
 
@@ -479,129 +474,34 @@ There is no combined dev binary. Run the bot and poller separately:
 
 ## 5. Terraform changes (`infra/`)
 
-### 5.1 Delete
+Terraform is applied in two phases matching the migration. The VM (`infra/compute.tf`) is **kept in Phase 1** and removed in Phase 2.
 
-- `infra/compute.tf` — the `google_compute_instance` + `container-vm` module (the GCE VM).
+### 5.1 Phase 1 — new files (VM untouched)
 
-### 5.2 Keep unchanged
+Phase 1 adds four new files and leaves `compute.tf`, `firestore.tf`, `repository.tf`, `provider.tf`, `vars.tf` unchanged.
 
-- `infra/firestore.tf` — Firestore DB + MongoDB-compatible indexes (reused as-is).
-- `infra/repository.tf` — Artifact Registry.
-- `infra/provider.tf` — provider + GCS backend.
-- `infra/vars.tf` — keep `app_name`, `project_id`, `region`; drop `zone` (Cloud Run is regional, not zonal); keep `freq`, `image`, `teloxide_token`, `mongodb_uri`; add `webhook_url`.
+**`infra/iam.tf`** — two service accounts:
+- `man-down-run` — the Cloud Run revisions' runtime SA (reads Secret Manager secrets).
+- `man-down-scheduler` — the Cloud Scheduler SA (invokes the poller Cloud Run service via OIDC).
 
-### 5.3 New: `infra/cloudrun.tf`
+**`infra/secrets.tf`** — Secret Manager secrets `mandown-teloxide-token` and `mandown-mongodb-uri`, with `google_secret_manager_secret_version` resources that write the sensitive values from the existing `var.teloxide_token` / `var.mongodb_uri` Terraform variables (same apply inputs as the old VM env), plus `roles/secretmanager.secretAccessor` bindings for the runtime SA.
 
-```hcl
-# Bot service (webhook receiver)
-resource "google_cloud_run_service" "bot" {
-  name     = "${var.app_name}-bot"
-  location = var.region
+**`infra/cloudrun.tf`** — the `mandown-poller` Cloud Run service only (the bot service is added in Phase 2):
+- `command = ["/mandown_poller"]`, `container_concurrency = 1`, `timeout_seconds = 300`
+- env `TELOXIDE_TOKEN` and `MONGODB_URI` pulled from Secret Manager
+- `service_account_email = google_service_account.runtime.email`
+- `lifecycle.ignore_changes = [image]` so CI can roll the image without Terraform fighting it
+- IAM: `roles/run.invoker` for the scheduler SA only — **no public ingress** (only Cloud Scheduler may call the poller)
 
-  template {
-    spec {
-      container_concurrency = 1
-      containers {
-        image = var.image
-        ports { container_port = 8080 }
-        env {
-          name  = "TELOXIDE_TOKEN"
-          value_from { secret_key_ref { name = google_secret_manager_secret.teloxide_token.secret_id; key = "latest" } }
-        }
-        env {
-          name  = "MONGODB_URI"
-          value_from { secret_key_ref { name = google_secret_manager_secret.mongodb_uri.secret_id; key = "latest" } }
-        }
-        env { name = "WEBHOOK_URL"; value = var.webhook_url }
-        env { name = "PORT"; value = "8080" }
-      }
-    }
-  }
-  traffic { percent = 100 }
-  autogenerate_revision_name = true
-}
+**`infra/scheduler.tf`** — one `google_cloud_scheduler_job` (`*/10 * * * *`) with an `http_target` POST to the poller Cloud Run URL, authenticated via an OIDC token for the scheduler SA.
 
-# Poller service (one sweep per HTTP POST from Scheduler)
-resource "google_cloud_run_service" "poller" {
-  name     = "${var.app_name}-poller"
-  location = var.region
+### 5.2 Phase 2 — additions and deletion
 
-  template {
-    spec {
-      container_concurrency = 1
-      timeout_seconds = 300
-      containers {
-        image = var.image
-        command = ["/mandown_poller"]
-        env {
-          name  = "TELOXIDE_TOKEN"
-          value_from { secret_key_ref { name = google_secret_manager_secret.teloxide_token.secret_id; key = "latest" } }
-        }
-        env {
-          name  = "MONGODB_URI"
-          value_from { secret_key_ref { name = google_secret_manager_secret.mongodb_uri.secret_id; key = "latest" } }
-        }
-      }
-    }
-  }
-  traffic { percent = 100 }
-}
+- **Add** the `mandown-bot` Cloud Run service to `infra/cloudrun.tf` (public ingress — `allUsers` invoker — for Telegram webhooks; `WEBHOOK_URL` + `PORT` env; `axum` listener on `8080`).
+- **Add** `webhook_url` to `infra/vars.tf`.
+- **Delete** `infra/compute.tf` (the GCE VM) and `terraform apply`.
 
-# Allow unauthenticated invocations (Telegram + Scheduler)
-resource "google_cloud_run_service_iam_member" "bot_public" {
-  service  = google_cloud_run_service.bot.name
-  location = var.region
-  role     = "roles/run.invoker"
-  member   = "allUsers"
-}
-resource "google_cloud_run_service_iam_member" "poller_invoker" {
-  service  = google_cloud_run_service.poller.name
-  location = var.region
-  role     = "roles/run.invoker"
-  member   = "serviceAccount:${google_service_account.scheduler.email}"
-}
-```
-
-### 5.4 New: `infra/scheduler.tf`
-
-```hcl
-resource "google_service_account" "scheduler" {
-  account_id   = "${var.app_name}-scheduler"
-  display_name = "ManDown Cloud Scheduler invoker"
-}
-
-resource "google_cloud_scheduler_job" "poll" {
-  name        = "${var.app_name}-poll"
-  description = "Trigger ManDown poller sweep"
-  schedule    = "*/10 * * * *"
-  time_zone   = "Etc/UTC"
-
-  http_target {
-    uri         = google_cloud_run_service.poller.status[0].url
-    http_method = "POST"
-    oidc_token {
-      service_account_email = google_service_account.scheduler.email
-    }
-  }
-}
-```
-
-### 5.5 New: `infra/secrets.tf`
-
-```hcl
-resource "google_secret_manager_secret" "teloxide_token" {
-  secret_id = "${var.app_name}-teloxide-token"
-  replication { auto = true }
-}
-resource "google_secret_manager_secret" "mongodb_uri" {
-  secret_id = "${var.app_name}-mongodb-uri"
-  replication { auto = true }
-}
-# + google_secret_manager_secret_version for the actual values (applied manually or via CI)
-# + google_secret_manager_secret_iam_member bindings so the Cloud Run runtime SA can read them
-```
-
-### 5.6 Scaling to zero (free tier)
+### 5.3 Scaling to zero (free tier)
 
 The Cloud Run services default to `min-instances=0`. Do **not** set `min_instance_count=1` on either service — that would make them always-billed (~$5/mo each). Cold starts (~1–2s for the Rust binary) are acceptable for a personal bot.
 
@@ -611,28 +511,35 @@ The Cloud Run services default to `min-instances=0`. Do **not** set `min_instanc
 
 ### 6.1 `.github/workflows/build-push.yaml`
 
-Replace the `Update prod image` step (currently `gcloud compute instances update-container`) with Cloud Run deploys:
+The `Update prod image` step (currently `gcloud compute instances update-container`) is replaced phase-by-phase:
+
+**Phase 1** — build and deploy only the poller image (the VM is untouched, so no `update-container`):
 
 ```bash
-# Deploy bot
-gcloud run deploy mandown-bot \
-  --image ${{ env.image_name }} \
-  --region ${{ vars.GCP_REGION }} \
-  --platform managed \
-  --no-traffic --quiet   # then shift 100% traffic to the new revision
-
-# Deploy poller (same image, different entrypoint)
+# Build the poller image from its own Dockerfile
+podman build -f crates/poller/Dockerfile -t ${{ vars.REPOSITORY_URI }}/mandown-poller:$TAG .
+# Push + deploy
 gcloud run deploy mandown-poller \
-  --image ${{ env.image_name }} \
+  --image ${{ vars.REPOSITORY_URI }}/mandown-poller:$TAG \
   --region ${{ vars.GCP_REGION }} \
   --platform managed --quiet
 ```
 
-Add new GitHub variables: `GCP_REGION`, `WEBHOOK_URL`. The existing `GCP_PROJECT_ID`, `GCP_WIF`, `REGISTRY_URI`, `REPOSITORY_URI`, `IMAGE`, `FREQ` are reused. `GCP_ZONE` is no longer needed.
+**Phase 2** — additionally build and deploy the bot image:
+
+```bash
+podman build -f crates/bot/Dockerfile -t ${{ vars.REPOSITORY_URI }}/mandown-bot:$TAG .
+gcloud run deploy mandown-bot \
+  --image ${{ vars.REPOSITORY_URI }}/mandown-bot:$TAG \
+  --region ${{ vars.GCP_REGION }} \
+  --platform managed --quiet
+```
+
+The two images are fully separate: each contains only its own binary (the poller image also ships `config.yaml`; the bot image does not). New GitHub variable required in Phase 1: `GCP_REGION` (e.g. `us-east1`). Phase 2 also needs `WEBHOOK_URL`. The existing `GCP_PROJECT_ID`, `GCP_WIF`, `REGISTRY_URI`, `REPOSITORY_URI`, `IMAGE`, `FREQ` are reused. `GCP_ZONE` stays in use by `terraform.yaml` (the VM still exists in Phase 1) and is dropped in Phase 2.
 
 ### 6.2 `.github/workflows/terraform.yaml`
 
-Unchanged in shape — just applies the new config. The `terraform plan` on PRs will show the GCE VM being destroyed and Cloud Run services being created.
+Unchanged in shape — it already passes `TF_VAR_teloxide_token` and `TF_VAR_mongodb_uri` from GitHub secrets, which `infra/secrets.tf` now consumes to populate Secret Manager. The apply inputs do not change. On PRs the plan will show the new Cloud Run/Scheduler/Secret resources being created (Phase 1) and the VM being destroyed (Phase 2).
 
 ### 6.3 `.github/workflows/pr-test.yaml`
 
