@@ -35,6 +35,11 @@ variable "image_poller" {
   type        = string
 }
 
+variable "image_webhook" {
+  description = "Webhook image"
+  type        = string
+}
+
 variable "teloxide_token" {
   description = "Teloxide token"
   type        = string
