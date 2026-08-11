@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [ main ]
     paths:
+      - '.github/actions/podman-build/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'crates/**'
@@ -61,6 +62,9 @@ jobs:
   poller-container:
     name: Build Poller Container
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
     - name: Checkout code
@@ -69,22 +73,19 @@ jobs:
         ref: ${{ github.event.pull_request.head.sha }}
         fetch-depth: 0
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v4
-
     - name: Build poller container
-      uses: docker/build-push-action@v7
+      uses: ./.github/actions/podman-build
       with:
-        context: .
-        file: crates/poller/Containerfile
-        push: false
-        tags: mandown-poller:ci
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        containerfile: crates/poller/Containerfile
+        image: mandown-poller:ci
+        cache_image: ${{ vars.REPOSITORY_URI }}/mandown-poller-buildcache
 
   webhook-container:
     name: Build Webhook Container
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
     - name: Checkout code
@@ -93,18 +94,12 @@ jobs:
         ref: ${{ github.event.pull_request.head.sha }}
         fetch-depth: 0
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v4
-
     - name: Build webhook container
-      uses: docker/build-push-action@v7
+      uses: ./.github/actions/podman-build
       with:
-        context: .
-        file: crates/webhook/Containerfile
-        push: false
-        tags: mandown-webhook:ci
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        containerfile: crates/webhook/Containerfile
+        image: mandown-webhook:ci
+        cache_image: ${{ vars.REPOSITORY_URI }}/mandown-webhook-buildcache
 
   security-audit:
     name: Security Audit

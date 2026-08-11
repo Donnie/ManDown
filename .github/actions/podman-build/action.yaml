@@ -1,0 +1,76 @@
+name: Podman Build Container
+description: Build a container with Podman, using Artifact Registry for layer cache
+
+inputs:
+  containerfile:
+    description: Path to the Containerfile
+    required: true
+  image:
+    description: Image reference to tag (and optionally push)
+    required: true
+  cache_image:
+    description: Artifact Registry repository for build cache (no tag)
+    required: true
+  push:
+    description: Whether to push the image to the registry
+    required: false
+    default: 'false'
+  github_variable:
+    description: If set after a push, update this GitHub Actions variable with the image name
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v3
+      with:
+        create_credentials_file: 'true'
+        project_id: ${{ vars.GCP_PROJECT_ID }}
+        workload_identity_provider: ${{ vars.GCP_WIF }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v3
+      with:
+        install_components: gcloud
+        project_id: ${{ vars.GCP_PROJECT_ID }}
+
+    - name: Install Podman
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y podman
+
+    - name: Authenticate Podman to Artifact Registry
+      shell: bash
+      run: |
+        gcloud auth print-access-token | podman login -u oauth2accesstoken --password-stdin ${{ vars.REGISTRY_URI }}
+
+    - name: Build container
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        CACHE_IMAGE: ${{ inputs.cache_image }}
+        CONTAINERFILE: ${{ inputs.containerfile }}
+        PUSH: ${{ inputs.push }}
+      run: |
+        podman build \
+          --layers \
+          --cache-from "$CACHE_IMAGE" \
+          --cache-to "$CACHE_IMAGE" \
+          -f "$CONTAINERFILE" \
+          -t "$IMAGE" .
+
+        if [ "$PUSH" = "true" ]; then
+          podman push "$IMAGE"
+        fi
+
+    - name: Set image variable
+      if: inputs.push == 'true' && inputs.github_variable != ''
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        GITHUB_VARIABLE: ${{ inputs.github_variable }}
+      run: |
+        gh variable set "$GITHUB_VARIABLE" -b "$IMAGE"
