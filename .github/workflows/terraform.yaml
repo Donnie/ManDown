@@ -8,10 +8,8 @@ on:
     paths:
       - 'infra/**'
   push:
-    branches:
-      - main
-    paths:
-      - 'infra/**'
+    tags:
+      - "*.*.*"
 
 env:
   GH_TOKEN: ${{ secrets.MANDOWN_PAT }}
@@ -153,11 +151,31 @@ jobs:
 
   terraform-apply:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/')
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v7
+
+    - name: Find Cargo tag
+      run: |
+        tag=$(grep "^version = " Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+        echo "CARGO_TAG=$tag" >> $GITHUB_ENV
+
+    - name: Verify version consistency
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "Cargo tag: $CARGO_TAG"
+        echo "Tag version: $GITHUB_REF_NAME"
+
+        if [ "$CARGO_TAG" != "$GITHUB_REF_NAME" ]; then
+          # Delete the tag
+          gh api -X DELETE /repos/${{ github.repository }}/git/refs/tags/$GITHUB_REF_NAME
+          echo "Error: Cargo tag ($CARGO_TAG) does not match tag version ($GITHUB_REF_NAME)."
+          exit 1
+        fi
+        echo "Version check passed."
 
     - name: Authenticate to Google Cloud
       id: auth
@@ -181,7 +199,7 @@ jobs:
     - name: Terraform Plan
       working-directory: ./infra
       run: |
-        echo "🔍 Running Terraform Plan on Main Branch"
+        echo "🔍 Running Terraform Plan for tag ${{ github.ref_name }}"
         terraform plan -no-color -out=tfplan
         
         echo "📋 Plan Summary:"
@@ -190,7 +208,7 @@ jobs:
     - name: Terraform Apply
       working-directory: ./infra
       run: |
-        echo "🚀 Applying Terraform changes to Main Branch"
+        echo "🚀 Applying Terraform changes for tag ${{ github.ref_name }}"
         terraform apply -auto-approve tfplan
         
         echo "✅ Terraform Apply completed successfully"
